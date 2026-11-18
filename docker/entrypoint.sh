@@ -5,7 +5,7 @@ umask 077
 mode="${1:-preflight}"
 if [[ $# -gt 0 ]]; then shift; fi
 if [[ "$mode" == "help" || "$mode" == "--help" ]]; then
-    printf '%s\n' 'Modes: preflight | agent | asr-diagnostic | asr-probe | tts-probe | mic-probe | dashboard | sim'
+    printf '%s\n' 'Modes: dependencies | preflight | agent | asr-diagnostic | asr-probe | tts-probe | mic-probe | dashboard | sim'
     exit 0
 fi
 cd /opt/eldercare
@@ -22,7 +22,7 @@ if [[ -n "${X2_ENV_SETUP:-}" ]]; then
     fi
     source "$X2_ENV_SETUP"
 fi
-if [[ "$mode" != "sim" && "$mode" != "dashboard" ]]; then
+if [[ "$mode" != "sim" && "$mode" != "dashboard" && "$mode" != "dependencies" ]]; then
     if [[ ! -r "${X2_AIMDK_SETUP:-}" ]]; then
         printf '%s\n' 'Mount the matching AimDK SDK at /home/agi/aimdk (or set X2_AIMDK_SETUP).' >&2
         exit 22
@@ -32,6 +32,7 @@ fi
 # Set paths last: robot environment scripts must not shadow bundled libraries.
 export PYTHONPATH="/opt/eldercare/vendor:/opt/eldercare:${PYTHONPATH:-}"
 case "$mode" in
+    dependencies) exec /usr/bin/python3 -c "import sys,platform,rclpy,websockets,httpx,httpcore,anyio,sniffio,exceptiongroup,typing_extensions,yaml,pypinyin; import x2_agent.agent; assert sys.version_info[:2] == (3,10); print('Python/ROS/application imports OK:',platform.machine())" ;;
     preflight) exec /usr/bin/python3 scripts/robot_preflight.py "$@" ;;
     agent) exec /usr/bin/python3 scripts/run_robot_agent.py "$@" ;;
     asr-diagnostic) exec /usr/bin/python3 scripts/aimdk_asr_diagnostic.py "$@" ;;

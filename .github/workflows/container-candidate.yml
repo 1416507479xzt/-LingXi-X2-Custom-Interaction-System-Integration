@@ -37,9 +37,8 @@ jobs:
       - name: Check image startup and bundled imports
         run: |
           docker run --rm eldercare-x2:candidate help
-          docker run --rm --network none --entrypoint /usr/bin/python3 \
-            eldercare-x2:candidate -c \
-            "import sys,platform,rclpy,websockets,httpx,httpcore,anyio,sniffio,exceptiongroup,typing_extensions,yaml,pypinyin; import x2_agent.agent; assert sys.version_info[:2] == (3,10); assert platform.machine() in ('aarch64','arm64'); print('ARM64 Python/ROS/application imports OK')"
+          test "$(docker image inspect eldercare-x2:candidate --format '{{.Architecture}}')" = arm64
+          docker run --rm --network none eldercare-x2:candidate dependencies
 
       - name: Check default refuses missing robot SDK
         run: |
