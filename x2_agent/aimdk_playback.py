@@ -5,6 +5,7 @@ This module is an output adapter: it knows nothing about competition dialogue.
 """
 
 import asyncio
+import logging
 import time
 import uuid
 
@@ -14,6 +15,8 @@ from .aimdk_audio import PCM_BYTES_PER_SECOND
 PLAYBACK_TOPIC = "/aima/hal/audio/playback"
 REQUEST_FOCUS = "/aimdk_5Fmsgs/srv/RequestAudioFocus"
 ABANDON_FOCUS = "/aimdk_5Fmsgs/srv/AbandonAudioFocus"
+PLAYBACK_LEAD_SECONDS = 0.2
+logger = logging.getLogger(__name__)
 
 
 class AudioFocusError(RuntimeError):
@@ -112,6 +115,9 @@ class AimdkPcmPlayer:
             self._has_focus = True
             self._token = uuid.uuid4().hex
             self._next_publish_time = time.monotonic()
+            self._published_bytes = 0
+            self._published_packets = 0
+            self._max_publish_lag_ms = 0.0
         except BaseException:
             self._lock.release()
             raise
@@ -127,7 +133,10 @@ class AimdkPcmPlayer:
         # Keep the hardware queue bounded even when cloud TTS emits a burst.
         for offset in range(0, len(pcm), 3200):
             chunk = pcm[offset:offset + 3200]
-            delay = self._next_publish_time - time.monotonic()
+            # Keep a small bounded lead in the HAL queue. Sending only when
+            # the previous frame has nominally ended makes every scheduler/
+            # ROS publish delay audible and prevents receiving TTS ahead.
+            delay = self._next_publish_time - time.monotonic() - PLAYBACK_LEAD_SECONDS
             if delay > 0:
                 await asyncio.sleep(delay)
             # This node is otherwise spun only during service calls. Process
@@ -145,7 +154,13 @@ class AimdkPcmPlayer:
             msg.data.data = list(chunk)
             msg.pkg_name = self.pkg_name
             msg.token_id = self._token
+            now = time.monotonic()
+            if self._published_bytes:
+                self._max_publish_lag_ms = max(self._max_publish_lag_ms,
+                                               (now - self._next_publish_time) * 1000)
             self.publisher.publish(msg)
+            self._published_bytes += len(chunk)
+            self._published_packets += 1
             self._next_publish_time = max(time.monotonic(), self._next_publish_time) + len(chunk) / PCM_BYTES_PER_SECOND
 
     async def end(self):
@@ -160,6 +175,9 @@ class AimdkPcmPlayer:
                 delay = self._next_publish_time - time.monotonic()
                 if delay > 0:
                     await asyncio.sleep(delay)
+                logger.info("AimDK音频发送统计 packets=%d pcm_seconds=%.2f max_publish_lag_ms=%.0f lead_ms=%.0f",
+                            self._published_packets, self._published_bytes / PCM_BYTES_PER_SECOND,
+                            self._max_publish_lag_ms, PLAYBACK_LEAD_SECONDS * 1000)
                 # On the tested v1.0.0 robot the first abandon response may
                 # still report focus_gain=True. A second identical request
                 # returned False, confirming that this source no longer owns

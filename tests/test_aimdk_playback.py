@@ -1,6 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from x2_agent.aimdk_playback import AimdkPcmPlayer, AudioFocusError
 
@@ -72,6 +73,45 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
 
         player._call = call
         return player, published, calls
+
+    async def test_bounded_lead_avoids_per_packet_drift_and_keeps_all_pcm(self):
+        player, published, _ = self.make_player()
+        clock = SimpleNamespace(value=100.0)
+        async def sleep(delay):
+            clock.value += max(0, delay)
+        times = []
+        def publish(msg):
+            times.append(clock.value)
+            published.append(msg)
+            clock.value += .004  # ROS publish/scheduling overhead.
+        player.publisher.publish = publish
+        with patch("x2_agent.aimdk_playback.time", SimpleNamespace(monotonic=lambda: clock.value)), patch("x2_agent.aimdk_playback.asyncio.sleep", sleep):
+            await player.begin()
+            pcm = b"\x01\x00" * 16000
+            await player.write(pcm)
+            await player.end()
+        self.assertEqual(b"".join(bytes(msg.data.data) for msg in published), pcm)
+        self.assertEqual(len({msg.token_id for msg in published}), 1)
+        self.assertLess(times[-1] - times[0], .8)
+        self.assertGreaterEqual(clock.value, 101.0)
+        self.assertLess(clock.value, 101.02)
+        self.assertEqual(player._max_publish_lag_ms, 0)
+        self.assertFalse(player._has_focus)
+
+    async def test_long_supply_gap_is_reported_without_changing_token(self):
+        player, published, _ = self.make_player()
+        clock = SimpleNamespace(value=100.0)
+        async def sleep(delay):
+            clock.value += max(0, delay)
+        with patch("x2_agent.aimdk_playback.time", SimpleNamespace(monotonic=lambda: clock.value)), patch("x2_agent.aimdk_playback.asyncio.sleep", sleep):
+            await player.begin()
+            await player.write(b"\x01\x00" * 4800)
+            clock.value += .8  # Simulate a cloud/network stall beyond the lead.
+            await player.write(b"\x02\x00" * 1600)
+            await player.end()
+        self.assertGreater(player._max_publish_lag_ms, 300)
+        self.assertEqual(len({msg.token_id for msg in published}), 1)
+        self.assertEqual(player._published_bytes, 12800)
 
     async def test_focus_denial_never_publishes(self):
         player, published, calls = self.make_player(granted=False)

@@ -162,7 +162,7 @@ class DiningFeedbackTests(unittest.IsolatedAsyncioTestCase):
 
 class NaturalConfirmationTests(unittest.TestCase):
     def test_explicit_short_spoken_confirmations_are_accepted(self):
-        for text in ("对，就这样记录。", "好的，记下来吧。", "就这样记录吧", "帮我记下来吧"):
+        for text in ("对，就这样记录。", "对的，要记录。", "好的，记下来吧。", "就这样记录吧", "帮我记下来吧"):
             with self.subTest(text=text):
                 prepared, _ = prepare_transition("[[DINING_PREPARE|taste|汤|有点咸|少放盐]]", None, "食堂汤有点咸，少放盐")
                 result, error = prepare_transition("[[DINING_CONFIRM]]", prepared["pending"], text)

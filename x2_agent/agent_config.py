@@ -74,6 +74,8 @@ class AgentConfig:
     log_level: str = "INFO"
     log_file: Optional[str] = None
     metrics_file: Optional[str] = None
+    service_data: Optional[str] = None
+    dining_feedback_records: Optional[str] = None
 
     # 协议版本
     protocol_version: str = "1.0.0"

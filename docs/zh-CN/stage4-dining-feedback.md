@@ -26,14 +26,14 @@ python3 scripts/robot_preflight.py
 
 ## PC2启动Agent
 
-在机器人项目目录执行，记录到单独测试文件，避免混入正常意见。该文件可能保留之前的测试行；请先记下已有行数，本轮应新增两条，不需要删除旧数据。
+在机器人项目目录执行，当前统一使用data/dining_feedback.jsonl，与已存在的反馈和网页启动器一致。该文件可能已有记录；先记下已有行数，只核对本轮新增数，不删除或覆盖旧数据。如需独立测试文件，Agent的--dining-feedback-records和网页启动器的-RecordsPath必须同时指向同一文件。
 
 ```bash
 mkdir -p logs
 SESSION_ID=$(date +%Y%m%d_%H%M%S)
 export DOUBAO_ASR_HOTWORDS='["灵犀"]'
 export X2_ONLY_VOICE_CONFIRMED=1
-python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend none --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback_stage4_test.jsonl --log-file "logs/voice_${SESSION_ID}.log" --metrics-file "logs/voice_${SESSION_ID}_metrics.json"
+python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend none --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback.jsonl --log-file "logs/voice_${SESSION_ID}.log" --metrics-file "logs/voice_${SESSION_ID}_metrics.json"
 ```
 
 结束Ctrl+C后：`unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS`。到点主动提醒不在开发范围，本流程不会启用它，也不执行表情动作。
@@ -46,7 +46,7 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 & 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
 ```
 
-输入当前机器人IPv4地址；启动器另开SSH窗口，在新窗口自行输入密码。它自动选择18765至18775之间的空闲本地端口，建立仅127.0.0.1监听的SSH转发，并在机器人相同端口启动反馈表，仍读取data/dining_feedback_stage4_test.jsonl。检查HTTP 200及反馈表标题成功后才打开浏览器。请使用自动打开的地址，不继续刷新旧8765页面；保留标注“食堂反馈表 SSH”的窗口。它不停止原语音Agent，不修改原生服务，不复制记录到外网。
+输入当前机器人IPv4地址；启动器另开SSH窗口，在新窗口自行输入密码。它自动选择18765至18775之间的空闲本地端口，建立仅127.0.0.1监听的SSH转发，并在机器人相同端口启动反馈表，仍读取data/dining_feedback.jsonl。检查HTTP 200及反馈表标题成功后才打开浏览器。请使用自动打开的地址，不继续刷新旧8765页面；保留标注“食堂反馈表 SSH”的窗口。它不停止原语音Agent，不修改原生服务，不复制记录到外网。
 
 脚本UTF-8带BOM，兼容PowerShell5.1；ExecutionPolicy Bypass仅对启动进程生效，不持久修改系统策略。SSH密码由OpenSSH自行交互输入，脚本不读取或保存。无法建立连接时查看SSH窗口报错；端口占用不关闭其他程序，会尝试其他空闲本地端口。如果已打开过一个正常反馈表窗口，直接使用那个窗口，结束时Ctrl+C关闭后再重新启动，避免反复开多个服务。
 
@@ -56,7 +56,7 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 
 ```powershell
 $RobotIp = Read-Host '输入机器人当前 Wi-Fi IP'
-ssh -t -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L 8765:127.0.0.1:8765 "agi@${RobotIp}" "cd /home/agi/eldercare-x2/eldercare_x2 && python3 -u feedback_dashboard.py --records data/dining_feedback_stage4_test.jsonl --port 8765"
+ssh -t -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L 8765:127.0.0.1:8765 "agi@${RobotIp}" "cd /home/agi/eldercare-x2/eldercare_x2 && python3 -u feedback_dashboard.py --records data/dining_feedback.jsonl --port 8765"
 ```
 
 自行输入SSH密码。看到本地反馈表地址后，在电脑浏览器打开 **http://127.0.0.1:8765/**，使用HTTP而非HTTPS。保持这个PowerShell窗口打开，刷新页面查看新增记录。
@@ -77,6 +77,8 @@ ssh -t -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCount
 可选边界测试：问“今天食堂有什么菜”，没有菜单资料时应说明无资料，不编造菜单；没有待确认意见时说“确认提交”，应说明暂无待确认内容，不写入。
 
 用户提出更正时仍可修改待确认内容，但纠正不是本轮比赛必测项；同音不确定时保留现有菜名核对。涉及用药或急迫健康求助时优先处理，不作为食堂意见写入。
+
+记录路径修复背景见[断续声音与反馈保存路径核查](2026-11-18-playback-and-feedback-path.md)。
 
 ## 记录和范围
 

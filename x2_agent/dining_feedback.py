@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 import html
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -9,13 +10,14 @@ import uuid
 
 LOCAL_TIME = timezone(timedelta(hours=8))
 DEFAULT_RECORDS = Path(__file__).resolve().parents[1] / "data" / "dining_feedback.jsonl"
+logger = logging.getLogger(__name__)
 PLAN = re.compile(r"^\[\[DINING_(PREPARE|CONFIRM|CANCEL)(?:\|([^\]\n]*))?\]\]$")
 KINDS = {"taste": "口味意见", "dish_request": "想吃的菜", "service": "食堂服务", "other": "其他意见"}
 CONFIRM = re.compile(
     r"\s*(?:确认(?:提交)?|提交(?:吧)?|好(?:的)?(?:，?提交吧)?|可以(?:提交)?|是的|没错|对(?:的)?|嗯，?提交吧|"
     r"(?:要|请|帮我)?(?:记录|记下|记入|记下来)(?:吧|一下)?|"
     r"(?:(?:对(?:的)?|是的|没错|好(?:的)?|可以)[，,]?)?(?:就这样|就是这样)?"
-    r"(?:请|帮我)?(?:记录|记下|记下来|提交)(?:吧|一下)?)\s*[，。！!]?\s*")
+    r"(?:要|请|帮我)?(?:记录|记下|记下来|提交)(?:吧|一下)?)\s*[，。！!]?\s*")
 
 DINING_PROMPT = """
 环节四食堂意见收集：只有用户明确谈社区食堂的口味、饭菜、想吃的菜或服务反馈时，才使用intent=dining/action=continue。
@@ -166,12 +168,14 @@ def save_feedback(record, path=None):
             raise ValueError("feedback register full")
         for saved in load_feedback(path):
             if saved.get("id") == record["id"]:
+                logger.info("食堂记录已存在，不重复写入 path=%s record_id=%s", path.resolve(), record["id"])
                 return
     saved = {**record, "submitted_at": datetime.now(LOCAL_TIME).isoformat()}
     with path.open("a", encoding="utf-8", newline="\n") as out:
         out.write(json.dumps(saved, ensure_ascii=False) + "\n")
         out.flush()
         os.fsync(out.fileno())
+    logger.info("食堂记录写入完成 path=%s record_id=%s", path.resolve(), record["id"])
 
 
 def load_feedback(path=None):

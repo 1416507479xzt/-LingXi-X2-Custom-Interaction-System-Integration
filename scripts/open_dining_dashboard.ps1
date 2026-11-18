@@ -1,6 +1,8 @@
 ﻿param(
     [string]$RobotIp,
     [int]$Port = 0,
+    [ValidateSet('data/dining_feedback.jsonl','data/dining_feedback_stage4_test.jsonl')]
+    [string]$RecordsPath = 'data/dining_feedback.jsonl',
     [switch]$SshSession,
     [switch]$CheckOnly
 )
@@ -52,10 +54,10 @@ if ($Port -eq 0) {
 }
 if ($Port -lt 1024 -or $Port -gt 65535) { throw '没有可用的网页端口。' }
 $url = "http://127.0.0.1:${Port}/"
-$remoteCommand = "cd /home/agi/eldercare-x2/eldercare_x2 && python3 -u feedback_dashboard.py --records data/dining_feedback_stage4_test.jsonl --port $Port"
+$remoteCommand = "cd /home/agi/eldercare-x2/eldercare_x2 && python3 -u feedback_dashboard.py --records $RecordsPath --port $Port"
 
 if ($CheckOnly) {
-    [pscustomobject]@{RobotIp=$RobotIp; BrowserUrl=$url; Records='data/dining_feedback_stage4_test.jsonl'; RemoteCommand=$remoteCommand}
+    [pscustomobject]@{RobotIp=$RobotIp; BrowserUrl=$url; Records=$RecordsPath; RemoteCommand=$remoteCommand}
     return
 }
 
@@ -76,7 +78,7 @@ Write-Host "将打开一个 SSH 窗口。请在新窗口确认主机信息并自
 Write-Host "网页准备好后自动打开：$url"
 $process = Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -PassThru -ArgumentList @(
     '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"'),
-    '-SshSession', '-RobotIp', $RobotIp, '-Port', $Port
+    '-SshSession', '-RobotIp', $RobotIp, '-Port', $Port, '-RecordsPath', $RecordsPath
 )
 for ($attempt = 0; $attempt -lt 90; $attempt++) {
     if (Test-FeedbackPage $Port) {
