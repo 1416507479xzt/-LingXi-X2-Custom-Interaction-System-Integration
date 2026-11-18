@@ -59,7 +59,7 @@ class ReplyStyleTests(unittest.IsolatedAsyncioTestCase):
 class InterviewClosingTests(unittest.TestCase):
     def test_observed_caring_endings_do_not_get_another_farewell(self):
         context = {"interview_active": True, "health_rounds": 1}
-        for ending in ("有任何不适请及时告诉我。", "若有其他不适，请告诉我。", "如果有不适随时告诉我。", "要是疲惫持续没有好转，记得及时和我说。"):
+        for ending in ("有任何不适请及时告诉我。", "若有其他不适，请告诉我。", "如果有不适随时告诉我。", "有其他不舒服，随时跟我说。", "要是疲惫持续没有好转，记得及时和我说。"):
             reply = {"intent": "health", "action": "close", "reply": "您说已经有点影响做事。" + ending}
             with self.subTest(ending=ending):
                 self.assertEqual(ensure_interview_closing(reply, context), reply)
@@ -90,3 +90,26 @@ class UnmentionedAdviceTests(unittest.IsolatedAsyncioTestCase):
         advice = "颈部避免长时间保持同一姿势。"
         self.assertTrue(unmentioned_neck_back_advice(advice, "有一点影响", [{"user": "疲惫", "assistant": "比如脖子疼"}]))
         self.assertFalse(unmentioned_neck_back_advice(advice, "有一点影响", [{"user": "脖子难受", "assistant": ""}]))
+
+
+class HealthRecallTests(unittest.IsolatedAsyncioTestCase):
+    async def test_failed_address_response_does_not_erase_health_quotes(self):
+        turns = [{"user": "我腰疼，脖子酸", "assistant": "若受伤请联系医护。"},
+                 {"user": "腰已经不酸，现在只是脖子不舒服", "assistant": "知道了。"},
+                 {"user": "你记得我哪里住吗", "assistant": "抱歉，我记不清了。"}]
+        calls = []
+        async def stream(prompt, messages, *args, **kwargs):
+            calls.append((prompt, messages))
+            reply = "您可以再和我说一下现在哪里不舒服呀。" if len(calls) == 1 else "您现在是脖子不舒服，腰已经不酸了。"
+            yield "text", json.dumps(dict(intent="chat" if len(calls) == 1 else "recall", action="continue", reply=reply, emotion=None, gesture=None))
+        answer = await generate_dialogue(SimpleNamespace(stream=stream), "你不记得我哪里不舒服了吗？",
+            {**ModelDialogue().context(), "verbatim_turns": turns, "capabilities": capabilities(backend="none")}, "model", "key")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("腰已经不酸", answer["reply"])
+        self.assertIn("health_recall_without_history_use", calls[1][0])
+
+    def test_address_queries_and_absent_history_are_not_forced_into_health_recall(self):
+        from x2_agent.model_dialogue import missed_health_recall
+        turns = [{"user": "脖子疼", "assistant": ""}]
+        self.assertFalse(missed_health_recall("请再说一下住址。", "你记得我哪里住吗？", turns))
+        self.assertFalse(missed_health_recall("请再说一下。", "你记得我哪里不舒服吗？", []))

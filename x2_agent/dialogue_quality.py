@@ -125,7 +125,7 @@ def review_flags(result, turns, utterance=""):
         flags.append("check_severity_against_user_quotes")
     # The model remains responsible for rephrasing; this only spots near-verbatim
     # re-delivery of multiple advice points when the visitor added new facts.
-    if turns and not re.search(r"再说|重复|怎么缓解|给.*建议|怎么办", utterance):
+    if turns and not re.search(r"再说|重复|怎么缓解|(?:有什么|有啥|有没有|哪些|什么).{0,8}(?:办法|建议)|给.*建议|怎么办", utterance):
         previous = " ".join(t.get("assistant", "") for t in turns[-2:])
         overlap = sum(bool(re.search(pattern, previous) and re.search(pattern, reply))
                       for pattern in ADVICE_PATTERNS)

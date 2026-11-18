@@ -403,3 +403,14 @@ class QualityTests(unittest.IsolatedAsyncioTestCase):
             "不是突然发生，只是比之前酸一些。", [])
         await self.run_review("现在腰突然疼得很厉害", "突然剧痛请及时就医。",
             "请现在联系现场医护或及时就医。", [])
+
+
+class ExplicitReliefRequestTests(unittest.TestCase):
+    def test_requested_relief_is_not_deleted_as_repeated_advice(self):
+        turns = [{"user": "脖子疼，腰酸", "assistant": "若没有受伤，避免长时间保持同一姿势，在不加重疼痛范围内维持日常活动。若近期摔倒或扭伤，请联系医护。"}]
+        draft = result(turns[0]["assistant"])
+        for utterance in ("有什么缓解的办法吗？", "有没有什么建议？", "怎么缓解？"):
+            with self.subTest(utterance=utterance):
+                self.assertNotIn("repeated_advice_ignores_new_information", review_flags(draft, turns, utterance))
+                self.assertEqual(suppress_repeated_advice(draft, turns, utterance), draft)
+        self.assertIn("repeated_advice_ignores_new_information", review_flags(draft, turns, "一两天吧"))

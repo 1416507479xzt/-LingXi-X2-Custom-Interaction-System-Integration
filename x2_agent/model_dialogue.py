@@ -61,7 +61,7 @@ def remove_registration_prefix(reply):
 
 
 _CARE_ENDING = "今天先照顾好自己，有需要再叫我。"
-_CARE_ENDING_PATTERN = re.compile(r"有需要|随时(?:叫|找|和我说|告诉我)|及时(?:和我说|告诉我)|(?:有|若有|如果有)(?:任何|什么|其他)?不适[，,]?(?:请)?(?:及时|随时)?告诉我|再叫我|照顾好自己|保重|祝您")
+_CARE_ENDING_PATTERN = re.compile(r"有需要|随时(?:叫|找|和我说|跟我说|告诉我)|及时(?:和我说|告诉我)|(?:有|若有|如果有)(?:任何|什么|其他)?不适[，,]?(?:请)?(?:及时|随时)?告诉我|再叫我|照顾好自己|保重|祝您")
 _URGENT_REPLY_PATTERN = re.compile(r"立即|马上|现在联系.{0,8}医护|及时就医|急救")
 
 
@@ -73,6 +73,19 @@ def unmentioned_neck_back_advice(reply, utterance, turns):
                 r"(?:" + body + r").{0,24}(?:避免|保持|维持|活动|姿势|久卧|枕头)", reply):
             return True
     return False
+
+
+
+def missed_health_recall(reply, utterance, turns):
+    """Require consulting user quotes for explicit symptom-memory questions.
+
+    This guard requests model repair; it does not infer current symptoms or
+    replace a misrecognized address question with a health question.
+    """
+    return (bool(re.search(r"记得|记不|不记|忘|刚才|之前", utterance))
+            and bool(re.search(r"哪里不舒服|哪[里儿].{0,6}(?:疼|酸|不适)|身体.{0,6}(?:情况|不舒服)", utterance))
+            and any(re.search(r"脖子|颈|腰|疲惫|累|不舒服", t.get("user", "")) for t in turns)
+            and bool(re.search(r"(?:再|重新).{0,10}(?:说|讲|告诉)|(?:忘|不记得|记不清|没记录)", reply)))
 
 
 def ensure_interview_closing(result, context):
@@ -186,7 +199,7 @@ reply最多180字，通常1到2句，尽量在70字内；必要安全说明可�
 
 连续对话：
 先看当前原话，再看pending_question及最近对话。短答应承接最近语义匹配的问题，而非机械绑定最后一个问号；中间若有无关插话或听不清的澄清，“有一点影响”仍可回答之前的疲惫是否影响做事，不必重复追问影响指什么。不能把无关话语当成健康事实。
-用户纠正覆盖旧说法；新增部位不能覆盖其他仍有效的不适；回顾使用用户原话，不添加推测。
+用户纠正覆盖旧说法；新增部位不能覆盖其他仍有效的不适；回顾使用用户原话，不添加推测。明确问“记不记得我哪里不舒服”时，必须先读verbatim_turns中的用户原话，按最新纠正回答；不能因为自己上一句说记不清，就继续声称遗忘或要求重说。用户没提供过住址时，应说明还没告诉过住址，不能声称曾知道但忘了，也不能擅自把住址问题改成健康问题。
 “一两天”等短答只关联最近问题或最近新增的不适，不把时长自动扩展到较早提到的疲惫等别的症状。
 response_status=unanswered只表示机器人没答好，不表示用户撤回事实。
 记忆是用户自述，不是诊断或已核实的服药记录。没有外部工具，不承诺已联系医护、设置提醒或更新医疗系统。
@@ -547,6 +560,8 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                 prompt += "用户正在回答开场的今日状态问题，本轮必须用health/followup：先自然回应‘还可以’等状态，再问一个健康相关的问题；不是简单致谢。"
             elif repair_reason in {"followup_not_allowed", "health_interview_already_closed"}:
                 prompt += "本轮禁止followup；新的健康求助或安全澄清使用other/continue，允许一个必要问题，不要输出health。"
+            elif repair_reason == "health_recall_without_history_use":
+                prompt += "本轮是明确的健康回顾请求。请读verbatim_turns中的用户原话，按最新纠正回顾，不把机器人上一句的记不清当成事实，不要求用户重说已有信息。不能增加未确认症状。"
             elif repair_reason == "unmentioned_neck_back_advice":
                 prompt += "只回应用户实际说过的状态，删除用户从未提及部位的建议。疲惫影响活动不等于腰颈疼痛。不要把care_reference示例当成用户病史。"
             elif repair_reason == "close_contains_question":
@@ -642,6 +657,9 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                 return validate_greeting("".join(chunks), context, diagnostics=diagnostic)
             result = validate_reply("".join(chunks), context, diagnostics=diagnostic,
                                     degrade_presentation=True)
+            if result and missed_health_recall(result["reply"], utterance, context.get("verbatim_turns", [])):
+                diagnostic["reason"] = "health_recall_without_history_use"
+                return None
             if result and result["intent"] in {"health", "other"} and unmentioned_neck_back_advice(
                     result["reply"], utterance, context.get("verbatim_turns", [])):
                 diagnostic["reason"] = "unmentioned_neck_back_advice"
