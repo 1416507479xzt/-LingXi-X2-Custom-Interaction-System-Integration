@@ -7,6 +7,7 @@ Outputs synthetic dialogue, not real patients' data. Human review is required.
 import argparse
 import asyncio
 import json
+import time
 from pathlib import Path
 import sys
 from datetime import datetime
@@ -19,7 +20,7 @@ from x2_agent.presentation import capabilities
 from x2_agent.life_assistance import load_context, LOCAL_TIME
 
 
-async def main(scenario="care"):
+async def main(scenario="care", presentation_backend="unity"):
     config = AgentConfig.from_env()
     if not config.ark_key:
         raise SystemExit("Missing ARK_API_KEY")
@@ -30,7 +31,7 @@ async def main(scenario="care"):
         greeting_trials = 3 if scenario == "care" else 1
         for index in range(greeting_trials):
             answer = await generate_dialogue(llm, "来访者唤醒", {
-                **ModelDialogue().context(), "turn_kind": "greeting", "capabilities": capabilities()
+                **ModelDialogue().context(), "turn_kind": "greeting", "capabilities": capabilities(backend=presentation_backend)
             }, config.llm_model, config.ark_key)
             print(json.dumps({"greeting_trial": index + 1, "answer": answer}, ensure_ascii=False))
             if index == greeting_trials - 1 and answer:
@@ -90,15 +91,16 @@ async def main(scenario="care"):
         if scenario == "regression_stage1_latest":
             utterances = ("我今天感觉有点疲惫。", "有一点影响日常活动。", "我是因为腰酸和脖子难受睡不好。",
                           "一两天吧。", "没有，目前没有加重。")
-        for utterance in utterances:
+        for turn, utterance in enumerate(utterances, 1):
+            started = time.perf_counter()
             answer = await generate_dialogue(llm, utterance, {
-                **memory.context(), "turn_kind": "dialogue", "capabilities": capabilities(),
+                **memory.context(), "turn_kind": "dialogue", "capabilities": capabilities(backend=presentation_backend),
                 **({"life_assistance": load_context()} if scenario in {"services", "medicines", "healthy_transition"} else {}),
                 **({"life_assistance": load_context(now=datetime(2026, 10, 23, 9, 45, tzinfo=LOCAL_TIME))} if scenario == "reminders" else {}),
                 **({"life_assistance": load_context(now=datetime(2026, 10, 24, 11, 1, tzinfo=LOCAL_TIME))} if scenario in {"regression_oct24", "regression_latest", "regression_stage1_latest"} else {}),
                 **({"life_assistance": load_context(now=datetime(2026, 10, 23, 15, 33, tzinfo=LOCAL_TIME))} if scenario in {"reminder_natural", "regression_oct23", "safe_relief", "quality_repeat", "quality_severity"} else {})
             }, config.llm_model, config.ark_key)
-            print(json.dumps({"user": utterance, "answer": answer}, ensure_ascii=False))
+            print(json.dumps({"turn": turn, "user": utterance, "answer": answer, "generation_ms": round((time.perf_counter() - started) * 1000), "presentation_backend": presentation_backend}, ensure_ascii=False))
             if answer:
                 memory.commit(utterance, answer)
             else:
@@ -111,7 +113,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Allow paid model calls (care: up to 18; conversation: up to 22; presentation/proactive: up to 10; services: up to 14)")
     parser.add_argument("--scenario", choices=("care", "conversation", "presentation", "proactive", "services", "medicines", "healthy_transition", "reminders", "reminder_natural", "regression_oct23", "regression_oct24", "regression_latest", "regression_stage1_latest", "safe_relief", "quality_repeat", "quality_severity"), default="care")
+    parser.add_argument("--presentation-backend", choices=("unity", "none"), default="unity", help="Use none to match the current voice-only robot")
     args = parser.parse_args()
     if not args.live:
         parser.error("--live is required; this uses the configured API account")
-    asyncio.run(main(args.scenario))
+    asyncio.run(main(args.scenario, args.presentation_backend))

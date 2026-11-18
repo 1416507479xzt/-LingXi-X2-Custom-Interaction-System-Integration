@@ -61,8 +61,18 @@ def remove_registration_prefix(reply):
 
 
 _CARE_ENDING = "今天先照顾好自己，有需要再叫我。"
-_CARE_ENDING_PATTERN = re.compile(r"有需要|随时(?:叫|找|和我说|告诉我)|再叫我|照顾好自己|保重|祝您")
+_CARE_ENDING_PATTERN = re.compile(r"有需要|随时(?:叫|找|和我说|告诉我)|及时(?:和我说|告诉我)|(?:有|若有|如果有)(?:任何|什么|其他)?不适[，,]?(?:请)?(?:及时|随时)?告诉我|再叫我|照顾好自己|保重|祝您")
 _URGENT_REPLY_PATTERN = re.compile(r"立即|马上|现在联系.{0,8}医护|及时就医|急救")
+
+
+def unmentioned_neck_back_advice(reply, utterance, turns):
+    """Reject unrelated body-specific advice; references are not user reports."""
+    user_quotes = " ".join([t.get("user", "") for t in turns] + [utterance])
+    for body in (r"脖子|颈", r"腰|背部|腰背"):
+        if not re.search(body, user_quotes) and re.search(
+                r"(?:" + body + r").{0,24}(?:避免|保持|维持|活动|姿势|久卧|枕头)", reply):
+            return True
+    return False
 
 
 def ensure_interview_closing(result, context):
@@ -490,7 +500,7 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                            "不推定病因，不保证效果。不重复‘您说疲惫/了解疲惫感/我记下了’等确认。"
                            "一句建议加一个相关问句即可，不为了表达共情再复述一遍症状。")
             elif context.get("interview_active"):
-                prompt += ("\n当前是开场第二轮，health必须close且不能提问；先回应本轮新增事实，不重复上一轮的生活建议，再自然关怀结束。"
+                prompt += ("\n当前是开场第二轮，health必须close且不能提问；先回应本轮新增事实，不重复上一轮的生活建议，再自然关怀结束。未提到腰颈不适时，不得套用资料里的腰颈建议；资料中的例子不是用户经历。"
                            "若上一轮问疲惫是否影响活动，老人答‘有一点’，应承接‘已经有点影响’，不要夸成严重，别只念泛泛的就医提示；"
                            "上一轮已说过规律作息或睡眠建议，本轮不要换词再说调整作息，改为承接生活影响并关怀收尾。"
                            "不重新说‘您好’。若当前是新求助或需安全澄清，改为other/continue可提问，绝不能followup。")
@@ -537,6 +547,8 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                 prompt += "用户正在回答开场的今日状态问题，本轮必须用health/followup：先自然回应‘还可以’等状态，再问一个健康相关的问题；不是简单致谢。"
             elif repair_reason in {"followup_not_allowed", "health_interview_already_closed"}:
                 prompt += "本轮禁止followup；新的健康求助或安全澄清使用other/continue，允许一个必要问题，不要输出health。"
+            elif repair_reason == "unmentioned_neck_back_advice":
+                prompt += "只回应用户实际说过的状态，删除用户从未提及部位的建议。疲惫影响活动不等于腰颈疼痛。不要把care_reference示例当成用户病史。"
             elif repair_reason == "close_contains_question":
                 prompt += "如果必须问安全澄清问题，请使用other/continue，不用close；如果仍为开场收尾，则去掉问题，给有依据的回应和关怀结束语。"
             elif repair_reason == "registration_only_reply":
@@ -628,6 +640,10 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                 return validate_greeting("".join(chunks), context, diagnostics=diagnostic)
             result = validate_reply("".join(chunks), context, diagnostics=diagnostic,
                                     degrade_presentation=True)
+            if result and result["intent"] in {"health", "other"} and unmentioned_neck_back_advice(
+                    result["reply"], utterance, context.get("verbatim_turns", [])):
+                diagnostic["reason"] = "unmentioned_neck_back_advice"
+                return None
             if result:
                 result = ensure_opening_followup(result, utterance, context)
                 result = ensure_fatigue_practical_tip(result, utterance, context)

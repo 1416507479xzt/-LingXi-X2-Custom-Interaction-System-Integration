@@ -2,7 +2,7 @@ import json
 import unittest
 from types import SimpleNamespace
 
-from x2_agent.model_dialogue import ModelDialogue, generate_dialogue, remove_registration_prefix
+from x2_agent.model_dialogue import ModelDialogue, generate_dialogue, remove_registration_prefix, ensure_interview_closing
 from x2_agent.presentation import capabilities
 
 
@@ -54,3 +54,39 @@ class ReplyStyleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(answer["reply"], "这样多久了？")
         self.assertEqual(len(calls), 2)
         self.assertIn("registration_only_reply", calls[1])
+
+
+class InterviewClosingTests(unittest.TestCase):
+    def test_observed_caring_endings_do_not_get_another_farewell(self):
+        context = {"interview_active": True, "health_rounds": 1}
+        for ending in ("有任何不适请及时告诉我。", "若有其他不适，请告诉我。", "如果有不适随时告诉我。", "要是疲惫持续没有好转，记得及时和我说。"):
+            reply = {"intent": "health", "action": "close", "reply": "您说已经有点影响做事。" + ending}
+            with self.subTest(ending=ending):
+                self.assertEqual(ensure_interview_closing(reply, context), reply)
+
+    def test_an_invitation_to_explain_is_not_a_caring_ending(self):
+        reply = {"intent": "health", "action": "close", "reply": "您刚才告诉我疲惫有点影响做事。"}
+        self.assertNotEqual(ensure_interview_closing(reply, {"interview_active": True, "health_rounds": 1}), reply)
+
+
+class UnmentionedAdviceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_fatigue_does_not_receive_reference_neck_back_advice(self):
+        memory = ModelDialogue()
+        memory.begin()
+        memory.commit("我今天感觉有点疲惫。", dict(intent="health", action="followup", reply="睡前可以听音乐放松，这种疲惫影响做事了吗？", emotion=None, gesture=None))
+        calls = []
+        async def stream(prompt, *args, **kwargs):
+            calls.append(prompt)
+            reply = "颈部避免长时间保持同一姿势。" if len(calls) == 1 else "已经有点影响做事了，今天先照顾好自己，有需要再叫我。"
+            yield "text", json.dumps(dict(intent="health", action="close", reply=reply, emotion=None, gesture=None))
+        answer = await generate_dialogue(SimpleNamespace(stream=stream), "有一点影响日常活动。",
+            {**memory.context(), "capabilities": capabilities(backend="none")}, "model", "key")
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("颈部", answer["reply"])
+        self.assertIn("unmentioned_neck_back_advice", calls[1])
+
+    def test_user_mentions_and_assistant_examples_are_distinguished(self):
+        from x2_agent.model_dialogue import unmentioned_neck_back_advice
+        advice = "颈部避免长时间保持同一姿势。"
+        self.assertTrue(unmentioned_neck_back_advice(advice, "有一点影响", [{"user": "疲惫", "assistant": "比如脖子疼"}]))
+        self.assertFalse(unmentioned_neck_back_advice(advice, "有一点影响", [{"user": "脖子难受", "assistant": ""}]))
