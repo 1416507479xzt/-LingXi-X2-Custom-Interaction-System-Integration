@@ -177,6 +177,14 @@ class TtsFailure(RuntimeError):
     pass
 
 
+def acknowledge_wake_greeting(text):
+    """Acknowledge a first wake without another model call or changing its question."""
+    if re.search(r"我在|我听着|听到(?:了|您)|听见|在这儿", text):
+        return text
+    remainder = re.sub(r"^(?:您好|你好)(?:呀|啊|呢)?[，,。！!\s]*", "", text, count=1)
+    return "您好，我在呢。" + remainder
+
+
 class DoubaoAgent:
     def __init__(self, args):
         self.args = args
@@ -762,6 +770,10 @@ class DoubaoAgent:
                     # This is the existing fixed greeting, not a medical answer.
                     logger.warning("agent     模型开场不可用，使用固定问候继续健康问询")
                     greeting_plan = DialogueReply(greeting_text, "happy", None)
+            if wake_triggered and self.health_flow is not None:
+                greeting_text = acknowledge_wake_greeting(greeting_text)
+                if greeting_plan is not None:
+                    greeting_plan = DialogueReply(greeting_text, greeting_plan.emotion, greeting_plan.gesture)
             await self.send(ws, envelope(T["llm_delta"], a.app_id,
                                          self.robot_cid, event_id,
                                          item_id=item_id, text=greeting_text))
