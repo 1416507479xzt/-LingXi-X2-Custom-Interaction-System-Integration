@@ -61,3 +61,5 @@ Windows 便携模拟器运行时，在仓库根目录安装 `requirements.txt`�
 当前纯语音优化与十轮连续对话测试见[真机对话验收步骤](docs/zh-CN/voice-dialogue-acceptance.md)，包含日志和耗时记录方式；表情动作继续关闭。
 
 环节四真机语音确认、独立反馈记录及电脑SSH隧道查看网页，见[社区食堂意见收集测试步骤](docs/zh-CN/stage4-dining-feedback.md)。
+
+Windows查看机器人食堂反馈表可双击仓库根目录`open_dining_dashboard.cmd`，输入当前IP并在新SSH窗口输入密码；连通后自动打开网页，保留该SSH窗口。

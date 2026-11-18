@@ -40,6 +40,18 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 
 ## 电脑查看机器人反馈表
 
+推荐在Windows电脑双击仓库根目录的`open_dining_dashboard.cmd`，或在电脑PowerShell执行：
+
+```powershell
+& 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
+```
+
+输入当前机器人IPv4地址；启动器另开SSH窗口，在新窗口自行输入密码。它自动选择18765至18775之间的空闲本地端口，建立仅127.0.0.1监听的SSH转发，并在机器人相同端口启动反馈表，仍读取data/dining_feedback_stage4_test.jsonl。检查HTTP 200及反馈表标题成功后才打开浏览器。请使用自动打开的地址，不继续刷新旧8765页面；保留标注“食堂反馈表 SSH”的窗口。它不停止原语音Agent，不修改原生服务，不复制记录到外网。
+
+脚本UTF-8带BOM，兼容PowerShell5.1；ExecutionPolicy Bypass仅对启动进程生效，不持久修改系统策略。SSH密码由OpenSSH自行交互输入，脚本不读取或保存。无法建立连接时查看SSH窗口报错；端口占用不关闭其他程序，会尝试其他空闲本地端口。如果已打开过一个正常反馈表窗口，直接使用那个窗口，结束时Ctrl+C关闭后再重新启动，避免反复开多个服务。
+
+手动方式仍可使用以下步骤：
+
 保留Agent SSH窗口。另开一个Windows PowerShell，变量不会从旧窗口自动继承，要重新输入IP。下面一条SSH同时建立端口转发、在机器人上运行本机网页服务：
 
 ```powershell
