@@ -16,13 +16,16 @@ sys.path.insert(0, str(ROOT / "vendor"))
 sys.path.insert(0, str(ROOT))
 
 from x2_agent.aimdk_audio import VadAssembler
+from x2_agent.config import load_env
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--env-file", help="本地密钥配置路径；默认项目根目录 .env")
     parser.add_argument("--duration", type=float, default=60)
     parser.add_argument("--stream-id", type=int, default=1)
     args = parser.parse_args(argv)
+    load_env(args.env_file)
     if args.duration <= 0 or args.stream_id < 0:
         parser.error("duration must be positive and stream-id nonnegative")
     speech_key = os.environ.get("DOUBAO_SPEECH_API_KEY", "")

@@ -25,6 +25,8 @@
 
 ## 下一步与交接
 
+按用户减少重复输入密钥的要求，三个语音探针接入现有 load_env 配置读取，与完整 Agent 共用项目根目录 .env，并支持 --env-file。开发电脑已从原仿真项目准备两把密钥的本地 .env，未输出密钥内容；Git 忽略检查通过。只提交自动读取的代码与说明，密钥文件不入库、不进入离线包。待操作者单独复制配置和新脚本到机器人后复测；未声称机器人已部署。
+
 已按[豆包 ASR 官方热词接口](https://docs.volcengine.com/docs/doubao-voice/hot-words-and-context?lang=zh)接入请求级提示：request.corpus.context 为序列化 JSON 字符串，内含 hotwords 数组。默认关闭；环境变量 DOUBAO_ASR_HOTWORDS 为 JSON 字符串数组，设置 ["灵犀"] 可启用，[] 可关闭。语音 Agent、单句探针和多段诊断共用此实现；多段诊断新增 --wake-hotwords 开关。仅提示专有名词，不强制替换“梅西”，也不把它加入唤醒别名。官方说明热词为概率性提示，不保证命中。
 
 本地8项测试通过，覆盖实际 WebSocket 配置报文、关闭时不发送 corpus、热词去重与配置校验、保留云端原始转写、识别期间持续收音。

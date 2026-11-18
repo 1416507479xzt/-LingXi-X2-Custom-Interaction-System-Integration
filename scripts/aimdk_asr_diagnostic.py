@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "vendor"))
 sys.path.insert(0, str(ROOT))
 
 from x2_agent.aimdk_audio import VadAssembler
+from x2_agent.config import load_env
 
 
 def pcm_levels(pcm):
@@ -50,6 +51,7 @@ async def recognize_with_capture(recognition, spin_once, ros_ok):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--env-file", help="本地密钥配置路径；默认项目根目录 .env")
     parser.add_argument("--duration", type=float, default=60,
                         help="overall listening limit in seconds")
     parser.add_argument("--count", type=int, default=4,
@@ -58,6 +60,7 @@ def main(argv=None):
     parser.add_argument("--wake-hotwords", action="store_true",
                         help="为本次识别请求启用灵犀热词提示")
     args = parser.parse_args(argv)
+    load_env(args.env_file)
     if args.duration <= 0 or args.count < 1 or args.count > 10 or args.stream_id < 0:
         parser.error("duration must be positive; count 1..10; stream-id nonnegative")
     if args.wake_hotwords:

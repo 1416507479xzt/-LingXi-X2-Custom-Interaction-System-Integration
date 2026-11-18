@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 from x2_agent.aimdk_audio import PCM_BYTES_PER_SECOND
 from x2_agent.tts import BidiTtsClient
+from x2_agent.config import load_env
 
 
 TEST_SENTENCE = "您好，我是灵犀，今天感觉怎么样？"
@@ -75,13 +76,16 @@ async def play(pcm, priority):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--env-file", help="本地密钥配置路径；默认项目根目录 .env")
     parser.add_argument("--play", action="store_true",
                         help="向机器人扬声器播放；必须先确认 only_voice 生效")
     parser.add_argument("--focus-priority", type=int, choices=(4, 5, 6), default=4,
                         help="探针音频焦点优先级，允许 4/5/6；默认 4")
-    parser.add_argument("--speaker", default=os.environ.get(
-        "DOUBAO_TTS_SPEAKER", "zh_female_vv_uranus_bigtts"))
+    parser.add_argument("--speaker")
     args = parser.parse_args(argv)
+    load_env(args.env_file)
+    args.speaker = args.speaker or os.environ.get(
+        "DOUBAO_TTS_SPEAKER", "zh_female_vv_uranus_bigtts")
     key = os.environ.get("DOUBAO_SPEECH_API_KEY", "")
     if not key:
         parser.error("缺少 DOUBAO_SPEECH_API_KEY")

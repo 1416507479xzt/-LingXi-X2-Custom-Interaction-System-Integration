@@ -79,6 +79,12 @@ unset DOUBAO_SPEECH_API_KEY
 
 ## 4. 运行完整 Agent 与恢复原生交互
 
+### 密钥只配置一次
+
+完整 Agent 和三个语音探针（ASR单句、多段诊断、TTS）均会读取项目根目录的本地 `.env`；探针也可通过 `--env-file` 指定其他位置。现有环境变量优先，修改文件后若仍使用旧值，应先 unset 对应环境变量。不要把 only_voice 人工确认变量持久写入此文件。
+
+将含自备密钥的 `.env` 单独用 SCP 复制到机器人 `/home/agi/eldercare-x2/eldercare_x2/.env`，再在机器人执行 `chmod 600 /home/agi/eldercare-x2/eldercare_x2/.env`。这一步由操作者提供自己的凭据；文件被 Git 忽略且不进入离线包。之后运行诊断或 Agent 不需要重复 read/export 两把 Key。从另一台电脑复现时必须自行准备该文件，不能依赖 Git 中存在密钥。完整 Agent 的 only_voice 人工确认仍须按现场实际状态设置。
+
 自研语音系统与 X2 Ultra 原生交互会争用音频。按照**机载版本对应的官方说明**，在获得当前机器人操作权限并确认恢复流程后，切换 `only_voice`，再运行 Agent。手头 AimDK v1.0.0 机器已通过原生问答停止验证 `only_voice` 切换，并通过原生问答恢复验证 `normal` 恢复。官方[过渡方案](https://x2-aimdk.agibot.com/zh-cn/v1.0.0/faq/temp_works.html)给出的参考命令如下；**仅适用于 X2 Ultra，且现场机器仍须核对固件与服务定义**：
 
 ```bash
