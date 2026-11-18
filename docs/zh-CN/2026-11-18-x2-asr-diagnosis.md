@@ -49,7 +49,7 @@
 
 操作经验：新开 SSH 默认回到 /home/agi，须重新 cd 到项目目录并 source AimDK；Windows PowerShell 用于 scp，机器人 PC2 SSH 用于运行 Linux 脚本。PC3 是交互计算单元，登录欢迎页显示 SoC2，不能只看同样的 agi@agi 提示符区分计算单元。模式设置服务若未响应，使用 timeout 15s 有限等待并核对响应；再在 PC3 重启 agent，通过原生问答停止确认 only_voice 生效。
 
-当前尚未完成完整自研对话验收。本次 only_voice 恢复到 normal 的操作尚未进行；结束联调时按复现指南恢复并核对原生问答。
+截至上述诊断阶段尚未完成完整自研对话验收，后续两轮语音成功结果见下一节。本次 only_voice 恢复到 normal 的操作尚未进行；结束联调时按复现指南恢复并核对原生问答。
 
 ## 正式Agent语音链路首次实测通过
 
