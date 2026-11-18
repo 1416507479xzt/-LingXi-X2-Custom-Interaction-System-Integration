@@ -1,0 +1,80 @@
+name: ARM64 container candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - requirements-lock.txt
+      - .dockerignore
+      - docker/**
+      - .github/workflows/container-candidate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build ARM64 candidate
+        run: |
+          docker build --platform linux/arm64 \
+            --build-arg APP_VERSION=candidate-${GITHUB_SHA:0:12} \
+            --build-arg VCS_REF="$GITHUB_SHA" \
+            -t eldercare-x2:candidate .
+
+      - name: Check image startup and bundled imports
+        run: |
+          docker run --rm eldercare-x2:candidate help
+          docker run --rm --network none --entrypoint /usr/bin/python3 \
+            eldercare-x2:candidate -c \
+            "import sys,platform,rclpy,websockets,httpx,httpcore,anyio,sniffio,exceptiongroup,typing_extensions,yaml,pypinyin; import x2_agent.agent; assert sys.version_info[:2] == (3,10); assert platform.machine() in ('aarch64','arm64'); print('ARM64 Python/ROS/application imports OK')"
+
+      - name: Check default refuses missing robot SDK
+        run: |
+          set +e
+          docker run --rm --network none eldercare-x2:candidate
+          result=$?
+          set -e
+          test "$result" -eq 22
+
+      - name: Run offline regressions in the ARM64 image
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/opt/eldercare/tests,readonly" \
+            --entrypoint /usr/bin/python3 eldercare-x2:candidate \
+            -m unittest tests.test_aimdk_streaming tests.test_aimdk_transport \
+              tests.test_asr_streaming tests.test_dialogue_quality tests.test_reply_style -q
+
+      - name: Validate Compose definition
+        run: |
+          touch .env
+          docker compose config --quiet
+
+      - name: Export candidate and source metadata
+        run: |
+          mkdir -p image-artifact
+          docker image inspect eldercare-x2:candidate > image-artifact/image-inspect.json
+          printf '%s\n' "$GITHUB_SHA" > image-artifact/source-commit.txt
+          printf '%s\n' 'Build/import/offline tests only. Robot DDS, AimDK SDK and physical interaction NOT validated.' > image-artifact/VALIDATION.txt
+          docker save eldercare-x2:candidate | gzip -1 > image-artifact/eldercare-x2-arm64.tar.gz
+          cd image-artifact
+          sha256sum eldercare-x2-arm64.tar.gz > SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eldercare-x2-arm64-candidate-${{ github.sha }}
+          path: image-artifact/
+          retention-days: 7
+          compression-level: 0
