@@ -10,6 +10,7 @@ import base64
 from contextlib import suppress
 import json
 import logging
+import time
 import uuid
 
 from .aimdk_audio import VadAssembler
@@ -21,7 +22,9 @@ logger = logging.getLogger("x2_agent")
 
 
 class AimdkLocalTransport:
-    def __init__(self, *, stream_id=1):
+    def __init__(self, *, stream_id=1, idle_seconds=0):
+        if idle_seconds != 0 and not 0.5 <= idle_seconds <= 5:
+            raise ValueError("idle_seconds must be 0 or 0.5..5")
         try:
             import rclpy
             from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
@@ -42,6 +45,8 @@ class AimdkLocalTransport:
         self._closed = False
         self._speaking = False
         self._playing = False
+        self.idle_seconds = idle_seconds
+        self._last_received = None
         qos = QoSProfile(depth=50, reliability=ReliabilityPolicy.BEST_EFFORT,
                          durability=DurabilityPolicy.VOLATILE)
         self.node.create_subscription(ProcessedAudioOutput,
@@ -50,9 +55,15 @@ class AimdkLocalTransport:
     def _on_audio(self, msg):
         if self._speaking:
             self.collector.reset()
+            self._last_received = None
             return
+        if msg.stream_id == self.collector.stream_id and msg.audio_vad_state.value in (1, 2, 3):
+            self._last_received = time.monotonic()
         utterance = self.collector.feed(msg.stream_id, msg.audio_vad_state.value,
                                         msg.audio_data)
+        self._queue_utterance(utterance)
+
+    def _queue_utterance(self, utterance):
         if utterance is None or not utterance.pcm:
             return
         try:
@@ -60,9 +71,23 @@ class AimdkLocalTransport:
         except asyncio.QueueFull:
             logger.warning("真机 VAD 队列已满，丢弃一段录音以免旧话延后播报")
 
+    def _check_idle(self, now=None):
+        now = time.monotonic() if now is None else now
+        if (not self.idle_seconds or self._speaking or self._last_received is None or
+                now - self._last_received < self.idle_seconds):
+            return
+        self._last_received = None
+        utterance = self.collector.take_pending(now)
+        if utterance is not None:
+            logger.warning("AimDK缺少VAD END：停收%.1fs，提交残留%.2fs PCM；"
+                           "本轮边界为超时恢复，可能不完整",
+                           self.idle_seconds, utterance.audio_seconds)
+            self._queue_utterance(utterance)
+
     async def _spin(self):
         while not self._closed and self.ros.ok():
             self.ros.spin_once(self.node, timeout_sec=0)
+            self._check_idle()
             await asyncio.sleep(0.005)
 
     async def __aenter__(self):

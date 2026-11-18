@@ -7,6 +7,7 @@ import unittest
 from x2_agent.aimdk_transport import AimdkLocalTransport
 from x2_agent.agent_config import AgentConfig
 from x2_agent.gateway import T
+from x2_agent.aimdk_audio import VadAssembler
 
 
 class FakePlayer:
@@ -24,6 +25,39 @@ class FakePlayer:
 
 
 class AimdkTransportTests(unittest.IsolatedAsyncioTestCase):
+    def pending_transport(self, idle=1.5):
+        transport = AimdkLocalTransport.__new__(AimdkLocalTransport)
+        transport.collector = VadAssembler()
+        transport.incoming = asyncio.Queue(maxsize=4)
+        transport._speaking = False
+        transport.idle_seconds = idle
+        transport._last_received = 1.1
+        transport.collector.feed(1, 1, b"12", 1.0)
+        transport.collector.feed(1, 2, b"34", 1.1)
+        return transport
+
+    async def test_missing_end_is_recovered_once_only_after_idle(self):
+        transport = self.pending_transport()
+        transport._check_idle(2.0)
+        self.assertTrue(transport.incoming.empty())
+        transport._check_idle(2.7)
+        self.assertEqual(transport.incoming.get_nowait(), b"1234")
+        transport._check_idle(4.0)
+        self.assertTrue(transport.incoming.empty())
+
+    async def test_idle_recovery_disabled_or_speaking_does_not_submit(self):
+        for idle, speaking in ((0, False), (1.5, True)):
+            transport = self.pending_transport(idle)
+            transport._speaking = speaking
+            transport._check_idle(4.0)
+            self.assertTrue(transport.incoming.empty())
+
+    async def test_normal_end_is_not_duplicated_by_idle_recovery(self):
+        transport = self.pending_transport()
+        transport._queue_utterance(transport.collector.feed(1, 3, b"56", 1.2))
+        transport._check_idle(4.0)
+        self.assertEqual(transport.incoming.get_nowait(), b"123456")
+        self.assertTrue(transport.incoming.empty())
     async def test_completed_vad_uses_existing_gateway_event_contract(self):
         transport = AimdkLocalTransport.__new__(AimdkLocalTransport)
         transport.incoming = asyncio.Queue()

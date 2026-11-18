@@ -66,6 +66,7 @@ class AgentConfig:
     transport: str = "unity"
     enable_robot_audio: bool = False
     mic_stream_id: object = "auto"
+    vad_idle_seconds: float = 0
     save_audio: Optional[str] = None
     save_input: Optional[str] = None
     skills_file: Optional[str] = None
@@ -101,6 +102,8 @@ class AgentConfig:
         if self.mic_stream_id != "auto" and (
                 type(self.mic_stream_id) is not int or self.mic_stream_id < 0):
             raise ValueError("mic_stream_id 必须是 auto 或非负整数")
+        if self.vad_idle_seconds != 0 and not 0.5 <= self.vad_idle_seconds <= 5:
+            raise ValueError("vad_idle_seconds 必须为0（关闭）或0.5到5秒")
         if self.presentation_backend == "aimdk" and (
                 not self.enable_robot_presentation or not self.competition_mode
                 or self.health_semantic != "model"):

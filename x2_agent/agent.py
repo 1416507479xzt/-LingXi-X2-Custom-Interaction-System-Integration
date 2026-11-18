@@ -924,7 +924,8 @@ class DoubaoAgent:
                          else a.mic_stream_id)
             logger.info("agent     AimDK %s 音频传输，麦流=%s；不自动切换原生交互模式",
                         profile.version, stream_id)
-            async with AimdkLocalTransport(stream_id=stream_id) as transport:
+            async with AimdkLocalTransport(
+                    stream_id=stream_id, idle_seconds=a.vad_idle_seconds) as transport:
                 await self.session(transport)
             return
         uri = "ws://%s:%d%s" % (a.host, a.port, a.path)
@@ -1003,6 +1004,8 @@ def parse_args(argv=None):
                    help="显式允许真机音频焦点申请和播放；不会自动切换only_voice")
     p.add_argument("--mic-stream-id", type=lambda value: "auto" if value == "auto" else int(value),
                    default="auto", help="auto按机载AimDK版本选内置麦；也可显式填写实测ID")
+    p.add_argument("--vad-idle-seconds", type=float, default=0,
+                   help="AimDK缺少END时的停收提交秒数；0关闭，现场验证后可选0.5到5")
     p.add_argument("--save-audio", metavar="PATH", default=None,
                    help="保存最后一轮 TTS 音频到 wav")
     p.add_argument("--save-input", metavar="PATH", default=None,
