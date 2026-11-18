@@ -39,3 +39,6 @@ vendor/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local test transcripts, metrics, and paid-call comparison outputs
+logs/
