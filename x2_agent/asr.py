@@ -1,5 +1,6 @@
 """Streaming audio upload and recognition lifecycle."""
 import asyncio
+import json
 import os
 import time
 import uuid
@@ -17,6 +18,20 @@ ASR_WS_URL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream"
 ASR_CHUNK_SIZE = 6400  # 200ms @16k16bit = 6400 bytes
 ASR_QUEUE_MAX_SIZE = 600  # 最多积压一分钟的音频帧（假设每帧 100ms）
 ASR_TIMEOUT_SECONDS = 30  # ASR 识别超时时间
+
+
+def configured_hotwords():
+    """Request-level hints; explicit JSON [] gives the unmodified baseline."""
+    raw = os.environ.get("DOUBAO_ASR_HOTWORDS", "[]")
+    try:
+        words = json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("DOUBAO_ASR_HOTWORDS 必须是 JSON 字符串数组") from exc
+    if (not isinstance(words, list) or len(words) > 20 or
+            any(not isinstance(word, str) or not word.strip() or
+                len(word) > 30 for word in words)):
+        raise ValueError("ASR 热词须为最多20个非空短词，每词最多30字符")
+    return list(dict.fromkeys(word.strip() for word in words))
 
 async def asr_transcribe(pcm16k: bytes, key: str, resource_id: str,
                          endpoint: Optional[str] = None) -> str:
@@ -45,6 +60,13 @@ async def asr_stream_transcribe(chunks, key: str, resource_id: str,
         "request": {"model_name": "bigmodel", "enable_punc": True,
                     "result_type": "full", "enable_itn": True},
     }
+    hotwords = configured_hotwords()
+    if hotwords:
+        # Official request.corpus.context is a JSON string, not a JSON object.
+        req_json["request"]["corpus"] = {
+            "context": json.dumps({"hotwords": [{"word": word} for word in hotwords]},
+                                  ensure_ascii=False)}
+        print("agent     ASR 热词提示已启用（%d项）" % len(hotwords))
     started = time.perf_counter()
     endpoint = endpoint or os.environ.get("ASR_WS_URL", ASR_WS_URL)
     async with websockets.connect(endpoint, additional_headers=headers,

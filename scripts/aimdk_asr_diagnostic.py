@@ -55,9 +55,20 @@ def main(argv=None):
     parser.add_argument("--count", type=int, default=4,
                         help="maximum VAD segments to inspect")
     parser.add_argument("--stream-id", type=int, default=1)
+    parser.add_argument("--wake-hotwords", action="store_true",
+                        help="为本次识别请求启用灵犀热词提示")
     args = parser.parse_args(argv)
     if args.duration <= 0 or args.count < 1 or args.count > 10 or args.stream_id < 0:
         parser.error("duration must be positive; count 1..10; stream-id nonnegative")
+    if args.wake_hotwords:
+        os.environ["DOUBAO_ASR_HOTWORDS"] = '["灵犀"]'
+    from x2_agent.asr import configured_hotwords
+    try:
+        words = configured_hotwords()
+    except ValueError as exc:
+        parser.error(str(exc))
+    print("ASR 热词设置：%s" % ("、".join(words) if words else "关闭（基线）"),
+          flush=True)
     speech_key = os.environ.get("DOUBAO_SPEECH_API_KEY", "")
     if not speech_key:
         raise SystemExit("缺少 DOUBAO_SPEECH_API_KEY；未订阅麦克风")

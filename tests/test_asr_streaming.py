@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import json
 import struct
 import unittest
@@ -9,6 +10,35 @@ from x2_agent import asr as agent
 
 
 class StreamingAsrTests(unittest.IsolatedAsyncioTestCase):
+    async def test_hotwords_are_sent_in_wire_request_and_text_stays_unmodified(self):
+        configs = []
+
+        async def server(ws):
+            config = await ws.recv()
+            configs.append(json.loads(gzip.decompress(config[8:]).decode()))
+            async for packet in ws:
+                if packet[1] & 2:
+                    body = json.dumps({'result': {'text': '梅西梅西'}}).encode()
+                    await ws.send(bytes([0x11, 0x93, 0x10, 0]) +
+                                  struct.pack('>iI', -1, len(body)) + body)
+                    return
+
+        async with websockets.serve(server, '127.0.0.1', 0) as listener:
+            url = 'ws://127.0.0.1:%d' % listener.sockets[0].getsockname()[1]
+            for raw in ('["灵犀", "灵犀"]', '[]'):
+                with patch.dict(agent.os.environ, {"DOUBAO_ASR_HOTWORDS": raw}):
+                    text = await agent.asr_transcribe(b"12", "test", "test", url)
+                    self.assertEqual(text, "梅西梅西")
+        context = json.loads(configs[0]["request"]["corpus"]["context"])
+        self.assertEqual(context, {"hotwords": [{"word": "灵犀"}]})
+        self.assertNotIn("corpus", configs[1]["request"])
+
+    def test_invalid_hotwords_fail_clearly(self):
+        for raw in ('灵犀', '{"word":"灵犀"}', '[null]', '[""]'):
+            with patch.dict(agent.os.environ, {"DOUBAO_ASR_HOTWORDS": raw}):
+                with self.assertRaises(ValueError):
+                    agent.configured_hotwords()
+
     async def test_upload_before_commit_and_binary_final_without_disconnect(self):
         uploaded = asyncio.Event()
         packets = []

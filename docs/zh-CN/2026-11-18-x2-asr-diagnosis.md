@@ -25,7 +25,11 @@
 
 ## 下一步与交接
 
-下一步核对豆包 ASR 当前接口是否支持请求内热词或其他上下文增强，再决定如何增强“灵犀”的识别；**此项尚未完成接口核对或代码接入**。修复后用安静、背景说话、普通句子和多次唤醒词对照测试，再验收正式 Agent 的问候与 Mini 回答。保持相同距离、正常音量，每句等提示后再说，记录真实话语与转写。
+已按[豆包 ASR 官方热词接口](https://docs.volcengine.com/docs/doubao-voice/hot-words-and-context?lang=zh)接入请求级提示：request.corpus.context 为序列化 JSON 字符串，内含 hotwords 数组。默认关闭；环境变量 DOUBAO_ASR_HOTWORDS 为 JSON 字符串数组，设置 ["灵犀"] 可启用，[] 可关闭。语音 Agent、单句探针和多段诊断共用此实现；多段诊断新增 --wake-hotwords 开关。仅提示专有名词，不强制替换“梅西”，也不把它加入唤醒别名。官方说明热词为概率性提示，不保证命中。
+
+本地8项测试通过，覆盖实际 WebSocket 配置报文、关闭时不发送 corpus、热词去重与配置校验、保留云端原始转写、识别期间持续收音。**尚未完成新增热词参数的云端或真机验收。**
+
+真机先更新 x2_agent/asr.py 和 scripts/aimdk_asr_diagnostic.py 两个文件，维持同一收音距离，使用 --wake-hotwords 测试“灵犀灵犀”“你好灵犀”和普通句，再测试静默与“梅西最近踢球怎么样”等干扰内容。去掉开关、设置 DOUBAO_ASR_HOTWORDS='[]' 可回到基线。记录实际输入与转写，若服务拒绝参数则停止增强测试并保留错误。真机复测后再决定正式 Agent 是否启用，随后验收问候与 Mini 回答。
 
 操作经验：新开 SSH 默认回到 /home/agi，须重新 cd 到项目目录并 source AimDK；Windows PowerShell 用于 scp，机器人 PC2 SSH 用于运行 Linux 脚本。PC3 是交互计算单元，登录欢迎页显示 SoC2，不能只看同样的 agi@agi 提示符区分计算单元。模式设置服务若未响应，使用 timeout 15s 有限等待并核对响应；再在 PC3 重启 agent，通过原生问答停止确认 only_voice 生效。
 
