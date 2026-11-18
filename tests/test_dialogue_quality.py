@@ -11,6 +11,29 @@ def result(text):
 
 
 class QualityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_observed_comma_joined_advice_is_delivered_without_review(self):
+        memory = ModelDialogue()
+        memory.begin()
+        memory.remember("语音唤醒", "您好呀，今天过得怎么样呀？")
+        draft = "您今天有点疲惫，睡前可以安排些放松活动，比如阅读或听轻松的音乐，这种疲惫影响您今天做事了吗？"
+        calls = []
+
+        async def stream(*args, **kwargs):
+            calls.append(1)
+            yield "text", json.dumps(dict(intent="health", action="continue",
+                reply=draft, emotion=None, gesture=None), ensure_ascii=False)
+
+        answer = await generate_dialogue(SimpleNamespace(stream=stream), "我今天有点疲惫。",
+            {**memory.context(), "capabilities": capabilities()}, "m", "k")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(answer["reply"], draft)
+        self.assertEqual(answer["action"], "followup")
+
+    def test_sleep_question_is_not_a_recommendation(self):
+        draft = result("您最近是否保持规律作息，睡前有没有安排放松活动？")
+        self.assertIn("fatigue_question_without_practical_tip",
+                      review_flags(draft, [], "我今天有点疲惫"))
+
     def test_existing_caring_close_is_not_appended_again(self):
         draft = dict(intent="health", action="close",
             reply="已经有一点影响日常活动了，您多留意身体状态，有其他不适随时告诉我。",

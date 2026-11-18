@@ -14,7 +14,7 @@ import time
 from typing import Optional
 from .presentation import EMOJI_IDS, MOTIONS
 from .care_reference import CARE_REFERENCE
-from .dialogue_quality import question_history, review_flags, suppress_repeated_question, suppress_repeated_advice, unconfirmed_injury_advice, unwanted_injury_followup, REVIEW_PROMPT
+from .dialogue_quality import question_history, review_flags, suppress_repeated_question, suppress_repeated_advice, unconfirmed_injury_advice, unwanted_injury_followup, has_fatigue_practical_tip, REVIEW_PROMPT
 from .life_assistance import SERVICE_PROMPT
 from .health_reminders import expand_reminder_reply, reminder_reply_error, reminder_transition
 from .medicine_consultation import dosage_context, medication_reply_error, medication_safe_fallback, expand_medicine_reply
@@ -109,8 +109,7 @@ def ensure_fatigue_practical_tip(result, utterance, context):
     reply = result["reply"]
     before_question = re.split(r"[？?]", reply, maxsplit=1)[0]
     if ("。" in before_question or "！" in before_question
-            or re.search(r"规律.{0,6}(?:作息|睡眠)|睡前.{0,15}(?:放松|阅读|音乐)|睡眠环境",
-                         before_question)):
+            or has_fatigue_practical_tip(reply)):
         return result
     tip = "听您说今天感觉疲惫，可以试着保持规律的作息。"
     return {**result, "reply": tip + reply} if len(tip) + len(reply) <= MAX_REPLY else result

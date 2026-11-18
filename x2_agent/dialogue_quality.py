@@ -80,6 +80,23 @@ def repeated_question(reply, turns):
                for q in questions(reply) for p in old if _normalized(q) and _normalized(p))
 
 
+def has_fatigue_practical_tip(reply):
+    """Recognize advice clauses even when a question is joined by a comma.
+
+    This output check does not decide the visitor's condition or choose advice.
+    Interrogative/quotation clauses do not establish a practical recommendation.
+    """
+    clauses = re.findall(r"[^，,。！？!?\n]+[，,。！？!?]?", reply)
+    for clause in clauses:
+        if (clause.endswith(("？", "?")) or
+                re.search(r"是否|有没有|能否|吗|么|告诉我|请问|[“”\"]", clause)):
+            continue
+        if (re.search(r"可以|可试|不妨|试试|尝试|建议|保持|安排", clause)
+                and re.search(r"规律.{0,6}(?:睡眠|作息)|睡前|阅读|音乐|放松|睡眠环境", clause)):
+            return True
+    return False
+
+
 def review_flags(result, turns, utterance=""):
     if result["intent"] not in {"health", "other", "correction", "recall"}:
         return []
@@ -89,7 +106,8 @@ def review_flags(result, turns, utterance=""):
     flags = []
     if ("疲惫" in utterance or "累" in utterance) and result["intent"] in {"health", "other"}:
         spoken = reply.strip()
-        if spoken.endswith(("？", "?")) and not re.search(r"[。！!]", spoken):
+        if (spoken.endswith(("？", "?")) and not re.search(r"[。！!]", spoken)
+                and not has_fatigue_practical_tip(spoken)):
             flags.append("fatigue_question_without_practical_tip")
     if (re.search(r"[一二两三四五六七八九十0-9]+\s*(?:天|周|星期|个月)", utterance)
             and turns and "疲惫" in reply and re.search(r"腰|脖子|颈", turns[-1].get("user", ""))
