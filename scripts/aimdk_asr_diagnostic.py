@@ -59,10 +59,14 @@ def main(argv=None):
     parser.add_argument("--stream-id", type=int, default=1)
     parser.add_argument("--wake-hotwords", action="store_true",
                         help="为本次识别请求启用灵犀热词提示")
+    parser.add_argument("--idle-finalize-seconds", type=float, default=0,
+                        help="仅诊断：停收指定秒后提交缺少END的残留片段；0关闭")
     args = parser.parse_args(argv)
     load_env(args.env_file)
     if args.duration <= 0 or args.count < 1 or args.count > 10 or args.stream_id < 0:
         parser.error("duration must be positive; count 1..10; stream-id nonnegative")
+    if args.idle_finalize_seconds and not 0.5 <= args.idle_finalize_seconds <= 5:
+        parser.error("idle-finalize-seconds must be 0 or 0.5..5")
     if args.wake_hotwords:
         os.environ["DOUBAO_ASR_HOTWORDS"] = '["灵犀"]'
     from x2_agent.asr import configured_hotwords
@@ -86,15 +90,19 @@ def main(argv=None):
     states = Counter()
     received_bytes = Counter()
     complete_count = 0
+    recovered_count = 0
+    last_received = None
     rclpy.init()
     node = rclpy.create_node("eldercare_asr_diagnostic")
     qos = QoSProfile(depth=50, reliability=ReliabilityPolicy.BEST_EFFORT,
                      durability=DurabilityPolicy.VOLATILE)
 
     def on_audio(msg):
-        nonlocal complete_count
+        nonlocal complete_count, last_received
         states[(msg.stream_id, msg.audio_vad_state.value)] += 1
         received_bytes[msg.stream_id] += len(msg.audio_data)
+        if msg.stream_id == args.stream_id and msg.audio_vad_state.value in (1, 2, 3):
+            last_received = time.monotonic()
         if msg.stream_id == args.stream_id and msg.audio_vad_state.value == 1:
             print("VAD BEGIN：本包%d字节；请连续说完目标句，随后安静等待。" %
                   len(msg.audio_data), flush=True)
@@ -111,6 +119,23 @@ def main(argv=None):
                 print("诊断积压超过4段，丢弃最旧片段；本轮需重新对照。", flush=True)
             pending.append(segment)
 
+    def spin_capture():
+        nonlocal last_received, recovered_count
+        rclpy.spin_once(node, timeout_sec=0.01)
+        if (args.idle_finalize_seconds and last_received is not None and
+                time.monotonic() - last_received >= args.idle_finalize_seconds):
+            segment = collector.take_pending()
+            last_received = None
+            if segment is not None:
+                recovered_count += 1
+                print("诊断恢复：停收%.1f秒仍无END，提交残留%.2f秒PCM；"
+                      "这不是正常完整片段，可能缺少开头或结尾。" %
+                      (args.idle_finalize_seconds, segment.audio_seconds), flush=True)
+                if len(pending) >= 4:
+                    pending.popleft()
+                    print("诊断队列已满，丢弃最旧片段。", flush=True)
+                pending.append(segment)
+
     node.create_subscription(ProcessedAudioOutput, "/agent/process_audio_output",
                              on_audio, qos)
     resource_id = os.environ.get("DOUBAO_ASR_RESOURCE_ID",
@@ -122,7 +147,7 @@ def main(argv=None):
         for index in range(1, args.count + 1):
             print("等待第 %d 段语音；看到此行后再说话。" % index, flush=True)
             while rclpy.ok() and not pending and time.monotonic() < deadline:
-                rclpy.spin_once(node, timeout_sec=0.1)
+                spin_capture()
             if not pending:
                 print("到时或 ROS 已停止；本次没有更多完整 VAD 片段。", flush=True)
                 break
@@ -136,7 +161,7 @@ def main(argv=None):
             try:
                 result = asyncio.run(recognize_with_capture(
                     asr_transcribe(segment.pcm, speech_key, resource_id),
-                    lambda: rclpy.spin_once(node, timeout_sec=0), rclpy.ok))
+                    spin_capture, rclpy.ok))
                 print("第 %d 段 ASR：%s" % (index, result or "<空>"), flush=True)
             except Exception as exc:
                 print("第 %d 段 ASR 错误：%s: %s" %
@@ -144,8 +169,10 @@ def main(argv=None):
     except KeyboardInterrupt:
         print("用户停止诊断。", flush=True)
     finally:
-        print("VAD统计：%s；各流总字节=%s；完整非空片段=%d；超长丢弃=%d" %
-              (dict(states), dict(received_bytes), complete_count, collector.discarded),
+        print("VAD统计：%s；各流总字节=%s；完整非空片段=%d；"
+              "缺END诊断恢复=%d；超长丢弃=%d" %
+              (dict(states), dict(received_bytes), complete_count,
+               recovered_count, collector.discarded),
               flush=True)
         node.destroy_node()
         if rclpy.ok():

@@ -4,6 +4,21 @@ from x2_agent.aimdk_audio import VadAssembler
 
 
 class VadAssemblerTests(unittest.TestCase):
+    def test_explicit_pending_recovery_is_single_use_and_does_not_leak(self):
+        collector = VadAssembler()
+        collector.feed(1, 1, b"begin", 1.0)
+        collector.feed(1, 2, b"tail", 1.1)
+        self.assertEqual(collector.take_pending(2.6).pcm, b"begintail")
+        self.assertIsNone(collector.take_pending(2.7))
+        self.assertIsNone(collector.feed(1, 3, b"", 2.8))
+        collector.feed(1, 1, b"new", 3.0)
+        self.assertEqual(collector.feed(1, 3, b"", 3.1).pcm, b"new")
+
+    def test_dropped_oversize_audio_cannot_be_recovered(self):
+        collector = VadAssembler(max_seconds=0.001)
+        collector.feed(1, 1, b"x" * 40, 0)
+        self.assertIsNone(collector.take_pending(0.1))
+
     def test_v1_onboard_complete_pcm_including_end_chunk(self):
         collector = VadAssembler()
         self.assertIsNone(collector.feed(1, 1, b"\x00\x01", 0.0))

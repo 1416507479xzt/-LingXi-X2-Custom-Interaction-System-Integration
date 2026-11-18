@@ -41,6 +41,20 @@ class VadAssembler:
         self._packets = 0
         self._dropping = False
 
+    def take_pending(self, now=None):
+        """Explicit diagnostic recovery only; missing END is not completion.
+
+        The caller must label the returned segment as incomplete. Normal
+        transport never calls this method and continues to require END.
+        """
+        if self._started is None or self._dropping or not self._pcm:
+            return None
+        now = time.monotonic() if now is None else now
+        result = VadUtterance(self.stream_id, bytes(self._pcm), self._packets,
+                              max(0.0, now - self._started))
+        self.reset()
+        return result
+
     def feed(self, stream_id, state, audio_data, now=None):
         """Return a complete utterance at END, or None; never return stale audio."""
         if stream_id != self.stream_id:
