@@ -1,8 +1,8 @@
-# 容器复现与镜像交接（候选方案，待构建和真机验收）
+# 容器复现与镜像交接（已构建候选，待真机验收）
 
-Dockerfile、Compose配置与启动脚本已纳入Git。镜像包含项目业务代码、预设资料、锁定的Python依赖及ROS 2 Humble基础环境；API Key在运行时单独挂载，食堂记录写入独立卷。**当前开发电脑没有Docker/Podman命令，尚未构建出镜像，也未做容器真机验收。**不能把本方案标成已经可一键复现。
+Dockerfile、Compose配置与启动脚本已纳入Git。镜像包含项目业务代码、预设资料、锁定的Python依赖及ROS 2 Humble基础环境；API Key在运行时单独挂载，食堂记录写入独立卷。**2026-11-18已通过GitHub Actions原生ARM64构建和离线检查，尚未做容器真机验收。**当前开发电脑没有Docker/Podman，本次使用云端构建，没有安装软件或重启电脑。完整结果见[首次构建记录](2026-11-18-container-build.md)。
 
-已完成静态验证：Bash语法检查及help入口运行、Compose YAML解析、默认preflight与模式确认默认为0的检查、密钥只读挂载及Dockerfile无全目录COPY的检查。尚未运行docker build或docker compose config，不能据此断言基础镜像可拉取、所有运行依赖齐全或DDS通信可用。
+已完成Bash语法及构建上下文检查；云端实际运行docker build、镜像help入口、Python/ROS/应用导入、缺少SDK时拒绝启动、56项离线测试及docker compose config。目标机器的AimDK SDK、共享库、DDS发现和真实收音播音仍须验收，不能据此宣称一键复现完整机器人效果。
 
 ## 与当前机器人版本的关系
 
@@ -34,7 +34,7 @@ docker save -o eldercare-x2-arm64.tar eldercare-x2:dev
 docker load -i eldercare-x2-arm64.tar
 ```
 
-这种方式无需重新下载构建依赖，但仍需要运行时云服务网络。也可在验收后上传GHCR等镜像仓库；**当前没有自动发布工作流，也未发布镜像**，避免把未验证构建当作正式发行版。使用Podman的官方目标按其镜像导入/导出命令和官方启动方式操作。
+这种方式无需重新下载构建依赖，但仍需要运行时云服务网络。目前GitHub Actions提供候选构建、检查和离线镜像附件，不自动发布正式版本或上传GHCR。候选附件保留7天，下载与导入方法见[构建记录](2026-11-18-container-build.md)。使用Podman的官方目标按其镜像导入/导出命令和官方启动方式操作。
 
 ## PC2获准容器环境中的预检
 
