@@ -67,6 +67,7 @@ class AgentConfig:
     enable_robot_audio: bool = False
     mic_stream_id: object = "auto"
     vad_idle_seconds: float = 0
+    aimdk_streaming_asr: bool = False
     save_audio: Optional[str] = None
     save_input: Optional[str] = None
     skills_file: Optional[str] = None
@@ -95,6 +96,8 @@ class AgentConfig:
             raise ValueError("未知表现后端")
         if self.transport not in ("unity", "aimdk"):
             raise ValueError("未知音频传输后端")
+        if self.aimdk_streaming_asr and (self.transport != "aimdk" or self.asr_after_commit):
+            raise ValueError("真机实时ASR需transport=aimdk，不能同时启用asr-after-commit")
         if self.transport == "aimdk" and (
                 not self.enable_robot_audio or not self.competition_mode
                 or self.presentation_backend == "unity"):

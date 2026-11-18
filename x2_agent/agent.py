@@ -868,6 +868,13 @@ class DoubaoAgent:
                 recording_started = time.perf_counter()
                 self._asr = (None if a.asr_after_commit else
                              StreamingAsr(a.speech_key, a.asr_resource_id, a.asr_ws_url))
+            elif ftype == T["a_cancel"]:
+                if self._asr is not None:
+                    await self._asr.close()
+                    self._asr = None
+                audio_buf = bytearray()
+                recording_started = None
+                logger.info("agent     未完成录音已取消，不提交模型")
             elif ftype == T["a_append"]:
                 b64 = f.get("audio", "")
                 pcm = base64.b64decode(b64) if b64 else b""
@@ -924,8 +931,11 @@ class DoubaoAgent:
                          else a.mic_stream_id)
             logger.info("agent     AimDK %s 音频传输，麦流=%s；不自动切换原生交互模式",
                         profile.version, stream_id)
+            logger.info("agent     真机ASR上传方式=%s",
+                        "BEGIN起实时上传" if a.aimdk_streaming_asr else "整段录完后上传")
             async with AimdkLocalTransport(
-                    stream_id=stream_id, idle_seconds=a.vad_idle_seconds) as transport:
+                    stream_id=stream_id, idle_seconds=a.vad_idle_seconds,
+                    streaming=a.aimdk_streaming_asr) as transport:
                 await self.session(transport)
             return
         uri = "ws://%s:%d%s" % (a.host, a.port, a.path)
@@ -1006,6 +1016,8 @@ def parse_args(argv=None):
                    default="auto", help="auto按机载AimDK版本选内置麦；也可显式填写实测ID")
     p.add_argument("--vad-idle-seconds", type=float, default=0,
                    help="AimDK缺少END时的停收提交秒数；0关闭，现场验证后可选0.5到5")
+    p.add_argument("--aimdk-streaming-asr", action="store_true",
+                   help="真机BEGIN即上传ASR，减少录完后才上传的等待；需实机对照测试")
     p.add_argument("--save-audio", metavar="PATH", default=None,
                    help="保存最后一轮 TTS 音频到 wav")
     p.add_argument("--save-input", metavar="PATH", default=None,

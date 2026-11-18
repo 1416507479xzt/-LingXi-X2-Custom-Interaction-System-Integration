@@ -11,6 +11,21 @@ def result(text):
 
 
 class QualityTests(unittest.IsolatedAsyncioTestCase):
+    def test_sleep_advice_before_impact_question_is_not_erased(self):
+        draft = dict(intent="health", action="followup",
+            reply="睡前可以安排些放松活动，比如阅读或听音乐，这种疲惫影响您今天做事了吗？",
+            emotion=None, gesture=None)
+        revised = soften_fatigue_question(draft, "今天有点疲惫",
+            {"health_rounds": 0})
+        self.assertEqual(revised["reply"], draft["reply"])
+
+    def test_only_sleep_question_clause_is_changed_after_advice(self):
+        draft = dict(intent="health", action="followup",
+            reply="睡前可以听些轻松的音乐，您最近睡得怎么样？",
+            emotion=None, gesture=None)
+        revised = soften_fatigue_question(draft, "今天有点疲惫", {"health_rounds": 0})
+        self.assertIn("睡前可以听些轻松的音乐，", revised["reply"])
+        self.assertTrue(revised["reply"].endswith("这种疲惫影响您今天做事了吗？"))
     async def test_observed_comma_joined_advice_is_delivered_without_review(self):
         memory = ModelDialogue()
         memory.begin()

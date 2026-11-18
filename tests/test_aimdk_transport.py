@@ -8,6 +8,7 @@ from x2_agent.aimdk_transport import AimdkLocalTransport
 from x2_agent.agent_config import AgentConfig
 from x2_agent.gateway import T
 from x2_agent.aimdk_audio import VadAssembler
+from x2_agent.aimdk_streaming import StreamingVadInput
 
 
 class FakePlayer:
@@ -25,6 +26,39 @@ class FakePlayer:
 
 
 class AimdkTransportTests(unittest.IsolatedAsyncioTestCase):
+    async def test_live_callback_emits_before_end_and_overflow_cancels(self):
+        transport = AimdkLocalTransport.__new__(AimdkLocalTransport)
+        transport._speaking = False
+        transport._live_frames = asyncio.Queue(maxsize=3)
+        transport._live = StreamingVadInput(transport._emit_live)
+        msg = SimpleNamespace(stream_id=1, audio_vad_state=SimpleNamespace(value=1),
+                              audio_data=b"12")
+        transport._on_audio(msg)
+        self.assertEqual(transport._live_frames.get_nowait()["type"], T["a_start"])
+        self.assertEqual(transport._live_frames.get_nowait()["type"], T["a_append"])
+        msg.audio_vad_state.value = 2
+        for _ in range(4):
+            transport._on_audio(msg)
+        self.assertEqual(transport._live_frames.get_nowait()["type"], T["a_cancel"])
+        self.assertTrue(transport._live.blocked)
+        self.assertIsNone(transport._live.event_id)
+
+    async def test_live_frames_follow_gateway_contract(self):
+        transport = AimdkLocalTransport.__new__(AimdkLocalTransport)
+        transport._closed = False
+        transport._speaking = False
+        transport._live_frames = asyncio.Queue()
+        transport._live = StreamingVadInput(transport._emit_live)
+        frames = transport._frames()
+        await anext(frames)  # sync
+        transport._on_audio(SimpleNamespace(stream_id=1,
+            audio_vad_state=SimpleNamespace(value=1), audio_data=b"12"))
+        self.assertEqual(json.loads(await anext(frames))["type"], T["a_start"])
+        self.assertEqual(json.loads(await anext(frames))["type"], T["a_append"])
+        transport._on_audio(SimpleNamespace(stream_id=1,
+            audio_vad_state=SimpleNamespace(value=3), audio_data=b""))
+        self.assertEqual(json.loads(await anext(frames))["type"], T["a_commit"])
+        await frames.aclose()
     def pending_transport(self, idle=1.5):
         transport = AimdkLocalTransport.__new__(AimdkLocalTransport)
         transport.collector = VadAssembler()

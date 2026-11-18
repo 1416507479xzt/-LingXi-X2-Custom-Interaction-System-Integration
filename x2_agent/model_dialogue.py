@@ -94,6 +94,11 @@ def soften_fatigue_question(result, utterance, context=None):
             and context.get("health_rounds", 0) == 0 and not re.search(r"睡|失眠", utterance)):
         end = max(reply.rfind("？"), reply.rfind("?"))
         start = max(reply.rfind("。", 0, end), reply.rfind("！", 0, end), reply.rfind("!", 0, end)) + 1
+        # Advice and the question may share a sentence separated by a comma.
+        # Never interpret '睡前听音乐' in that advice as a sleep question and
+        # replace the entire sentence (which used to erase the actual advice).
+        start = max(start, reply.rfind("，", start, end) + 1,
+                    reply.rfind(",", start, end) + 1)
         question = reply[start:end + 1]
         if 0 <= end and "睡" in question and len(question) <= 40:
             reply = reply[:start] + "这种疲惫影响您今天做事了吗？" + reply[end + 1:]
@@ -737,6 +742,9 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                     result = suppress_repeated_question(result, context.get("verbatim_turns", []), utterance)
                     result = suppress_repeated_advice(result, context.get("verbatim_turns", []), utterance)
                     result = soften_fatigue_question(result, utterance, context)
+                    # Re-check the final spoken version after style guards,
+                    # not just the earlier model draft.
+                    result = ensure_fatigue_practical_tip(result, utterance, context)
                     result = ensure_interview_closing(result, context)
                 return result
             report()

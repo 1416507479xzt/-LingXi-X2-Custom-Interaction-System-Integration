@@ -16,6 +16,7 @@ T = {
     "a_start": "agentsdk.audio_request.start",
     "a_append": "agentsdk.audio_request.append",
     "a_commit": "agentsdk.audio_request.commit",
+    "a_cancel": "agentsdk.audio_request.cancel",
     "state": "agentsdk.state_request.meta",
     "asr_final": "agentsdk.asr_response.final",
     "llm_delta": "agentsdk.llm_response.item.delta",
