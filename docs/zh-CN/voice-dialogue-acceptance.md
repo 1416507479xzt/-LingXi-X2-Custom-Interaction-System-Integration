@@ -2,9 +2,9 @@
 
 固定Mini和none表现后端，使用ZIP部署。Key由机上.env读取，不保存录音。日志含转写和回答，仅用虚构对话测试。
 
-比赛必测流程不包含纠正问题；保留相关内部回归能力。最新结果见[20:20真机复测与修复](2026-11-18-2020-voice-followup.md)。
+比赛必测流程不包含纠正问题；保留相关内部回归能力。第三版当前结果见[最新真机闭环记录](2026-11-18-playback-and-feedback-path.md)及[验收状态](aimdk-v1-robot-audio.md)。用户确认最新语音效果良好，食堂网页实时更新；当前相关离线回归164项通过。下节为早期优化过程，不是当前验收结论。
 
-## 2026-11-18优化及验证
+## 早期优化与历史文本样本
 
 - 修复已有“有任何不适请及时告诉我”“及时和我说”时仍追加第二句关怀收尾。
 - 增加未提及腰颈部位的建议校验，要求模型按用户实际引述修正；已有用户提到对应部位则允许建议。这是针对本次失败的窄范围检查，不代表全面事实校验。
@@ -53,11 +53,11 @@ mkdir -p logs
 SESSION_ID=$(date +%Y%m%d_%H%M%S)
 export DOUBAO_ASR_HOTWORDS='["灵犀"]'
 export X2_ONLY_VOICE_CONFIRMED=1
-python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend none --vad-idle-seconds 1.5 --aimdk-streaming-asr --log-file "logs/voice_${SESSION_ID}.log" --metrics-file "logs/voice_${SESSION_ID}_metrics.json" --dining-feedback-records "logs/dining_${SESSION_ID}.jsonl"
+python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend none --vad-idle-seconds 1.5 --aimdk-streaming-asr --log-file "logs/voice_${SESSION_ID}.log" --metrics-file "logs/voice_${SESSION_ID}_metrics.json" --dining-feedback-records data/dining_feedback.jsonl
 unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS
 ```
 
-最后一行在Ctrl+C停止后执行。一次只运行一个Agent；现阶段不支持语音打断，等机器人说完再说下一句。合成食堂反馈进入本次独立日志目录，不混入日常记录。结束后如需原生对话，按上述说明恢复normal并验证实际回答。
+最后一行在Ctrl+C停止后执行。一次只运行一个Agent；现阶段不支持语音打断，等机器人说完再说下一句。反馈与网页统一使用 data/dining_feedback.jsonl；核对本轮新增记录，不删改旧记录。独立测试时须让 Agent 和网页同时指向另一文件。结束后如需原生对话，按上述说明恢复normal并验证实际回答。
 
 ## 连续测试
 
@@ -76,6 +76,6 @@ unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS
 | 9 | 食堂今天的汤太咸了，希望清淡一点。 | 正确提取意见，未确认不谎报保存 |
 | 10 | 对，就这样记录。 | 对应当时确认问题，正确保存一次 |
 
-记录真实输入、ASR转写、完整播出、误唤醒/漏听、重复追问、模型修正次数和每轮耗时。第9/10轮会生成合成反馈；查看网页时要指向本次独立记录文件。
+记录真实输入、ASR转写、完整播出、误唤醒/漏听、重复追问、模型修正次数和每轮耗时。第9/10轮会生成合成反馈；查看网页时必须读取 Agent 实际写入的同一文件。
 
 ASR耗时从commit后计；TTS首包是云端音频到达，不是扬声器首声。缺END还可能增加1.5秒停收等待；焦点请求和播放缓冲也有开销。不得把commit到TTS首包当成说完到听见声音。指标JSON提供汇总，单轮定位结合日志，有条件用外部秒表记录实际听感等待。

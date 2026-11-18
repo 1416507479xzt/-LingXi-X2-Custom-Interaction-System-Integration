@@ -1,5 +1,7 @@
 # 示例 Agent：语音对话与机器人技能
 
+> 本页为仿真客户端参考，命令在本仓库根目录执行。第三版真机部署以[复现指南](reproduce-on-x2.md)和[当前验收状态](aimdk-v1-robot-audio.md)为准。Unity 工程、模拟器及图形控制台属于上游工程，不在本仓库；外链为上游资料。
+
 **中文** | [English](../en/README.md) | [Français](../fr/README.md)
 
 Python 客户端通过 WebSocket 连接 Unity 机器人网关。`agent.py` 使用豆包语音服务和火山方舟完成对话与技能调用，`demo.py` 用固定文字和录音验证连接与音频播放。
@@ -11,12 +13,12 @@ Python 客户端通过 WebSocket 连接 Unity 机器人网关。`agent.py` 使�
 | `python agent.py` | **语音对话与技能调用**。需要云服务密钥；录音期间上传 ASR，接收 LLM 流式回复并同步进行 TTS 合成 |
 | `python demo.py` | **离线连接测试**。收到语音后返回固定文字并播放内置录音；录音不可用时使用正弦提示音 |
 
-下文命令均在仓库的 `example/x2_agent/` 目录运行，使用 Windows PowerShell。Linux/macOS 可按本机环境将 `python` 改为 `python3`；仓库提供的便携模拟器仅适用于 Windows。
+下文命令均在仓库的 `仓库根目录` 目录运行，使用 Windows PowerShell。Linux/macOS 可按本机环境将 `python` 改为 `python3`；仓库提供的便携模拟器仅适用于 Windows。
 
 ## 工程结构
 
-`example/x2_agent/` 是独立 Agent 项目，可整体复制运行，配置读取该项目根目录的 `.env`。下表路径均相对于该项目根目录。
-图形控制台是另一个独立项目，见[控制台指南](../../../../docs/zh-CN/console.md)。
+`仓库根目录` 是独立 Agent 项目，可整体复制运行，配置读取该项目根目录的 `.env`。下表路径均相对于该项目根目录。
+图形控制台是另一个独立项目，见[控制台指南](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/zh-CN/console.md)。
 
 | 路径 | 用途 |
 |---|---|
@@ -43,7 +45,7 @@ Python 客户端通过 WebSocket 连接 Unity 机器人网关。`agent.py` 使�
   - 语音技术（ASR + TTS）→ `DOUBAO_SPEECH_API_KEY`
   - 火山方舟（LLM）→ `ARK_API_KEY`
 
-在 `example/x2_agent/` 目录打开 PowerShell：
+在 `仓库根目录` 目录打开 PowerShell：
 
 ```powershell
 python -m pip install -r requirements.txt
@@ -55,10 +57,10 @@ python -m pip install -r requirements.txt
 
 先选择一种方式启动机器人侧：
 
-- **便携模拟器**：下载并运行 GitHub Releases 中的 Windows EXE，详见[模拟器指南](../../../../docs/zh-CN/simulator.md)。
-- **从 Unity 工程开始**：用 Unity **2022.3.62f3c1** 打开 `unity-agent-playground/`，打开 `Assets/X02Competition/Scenes/scene.unity` 并点击 Play，详见 [Unity 工程指南](../../../../docs/zh-CN/unity.md)。
+- **便携模拟器**：下载并运行 GitHub Releases 中的 Windows EXE，详见[模拟器指南](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/zh-CN/simulator.md)。
+- **从 Unity 工程开始**：用 Unity **2022.3.62f3c1** 打开 `unity-agent-playground/`，打开 `Assets/X02Competition/Scenes/scene.unity` 并点击 Play，详见 [Unity 工程指南](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/zh-CN/unity.md)。
 
-两种方式使用同一个本机网关端口 `9002`，只启动其中一种。然后在 `example/x2_agent/` 目录启动一个 Agent：
+两种方式使用同一个本机网关端口 `9002`，只启动其中一种。然后在 `仓库根目录` 目录启动一个 Agent：
 
 ```powershell
 # 离线连接与音频测试
@@ -91,7 +93,7 @@ python agent.py
 | "往前走一米" / "向左转" | 步态前进 / 原地转向 |
 | "停" | 识别请求并下发 `stop` 技能后停止；播报期间请使用面板停止按钮或显式打断指令 |
 
-回答时嘴巴随语音张合。技能名称和参数见[网关协议的技能表](../../../../docs/zh-CN/interface.md)。
+回答时嘴巴随语音张合。技能名称和参数见[网关协议的技能表](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/zh-CN/interface.md)。
 
 当前语音流程是半双工，录音提交后，识别、生成回复及播报期间 VAD 暂停；等待回答结束后再说话。空识别、失败或连续 90 秒无回复进展会恢复聆听。默认音色和提示词面向中文，文档翻译不改变语音服务或界面语言。
 
@@ -131,16 +133,16 @@ python demo.py --interrupt chat
 ## .env 变量
 
 配置在启动时加载，导入模块不会自动读取密钥。优先级为：命令行参数 > 已有环境变量 > `.env` > 内置默认值。
-脚本默认读取 `example/x2_agent/` 项目根目录的 `.env`。
-从仓库根目录可直接执行 `python example/x2_agent/agent.py`，默认仍读取 `example/x2_agent/.env`。也可通过 `--env-file` 参数指定自己的配置文件路径；指定的文件不存在会报错。
+脚本默认读取 `仓库根目录` 项目根目录的 `.env`。
+从仓库根目录可直接执行 `python agent.py`，默认仍读取 `.env`。也可通过 `--env-file` 参数指定自己的配置文件路径；指定的文件不存在会报错。
 
 | 变量 | 必填 | 说明 |
 |---|---|---|
 | `DOUBAO_SPEECH_API_KEY` | 是 | 语音控制台 API Key（ASR + TTS 共用） |
 | `ARK_API_KEY` | 是 | 方舟 API Key（LLM） |
 | `DOUBAO_LLM_MODEL` | 否 | 默认 `doubao-seed-2-0-mini-260428` |
-| `DOUBAO_TTS_SPEAKER` | 否 | 默认 `zh_female_wanqudashu_moon_bigtts`（1.0 音色，勿混用 2.0 音色） |
-| `DOUBAO_ASR_RESOURCE_ID` | 否 | 默认 `volc.bigasr.sauc.duration` |
+| `DOUBAO_TTS_SPEAKER` | 否 | 默认 `zh_female_vv_uranus_bigtts`（2.0 音色） |
+| `DOUBAO_ASR_RESOURCE_ID` | 否 | 默认 `volc.seedasr.sauc.duration` |
 
 服务端点可用 `ARK_API_URL`、`ASR_WS_URL`、`TTS_WS_URL`、`TTS_SENTENCE_WS_URL`
 配置，也可分别使用 `--ark-api-url`、`--asr-ws-url`、`--tts-ws-url`、
@@ -148,7 +150,7 @@ python demo.py --interrupt chat
 Agent 默认使用项目 `skills.yaml` 定义工具、参数和即时口播，`--skills-file` 可替换它。
 `--log-level`、`--log-file` 控制调度日志，`--metrics-file` 在正常退出或 Ctrl+C 时导出
 计数与最近 1000 个耗时样本的统计。指标不包含真人录音时长；下发技能计数不代表执行成功。
-完整示例见[配置参考](../../../../docs/zh-CN/environment-config.md)。
+完整示例见[配置参考](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/zh-CN/environment-config.md)。
 
 ## 常见问题
 
@@ -169,11 +171,11 @@ Agent 默认使用项目 `skills.yaml` 定义工具、参数和即时口播，`-
 TTS 会话，接收文字和合成音频并行。开场白也走同一条双向合成链路。
 首包日志分别记录 ASR 提交后等待、LLM 首 token、首文字到首音频，避免混淆计时范围。
 
-依赖更新后，在 `example/x2_agent/` 目录重新执行 `python -m pip install -r requirements.txt`。
+依赖更新后，在 `仓库根目录` 目录重新执行 `python -m pip install -r requirements.txt`。
 
 ## 运行回归测试
 
-在 `example/x2_agent` 目录执行：
+在 `仓库根目录` 目录执行：
 
 ```powershell
 python -B -m unittest discover -s tests -v
@@ -181,7 +183,7 @@ python -B -m unittest discover -s tests -v
 
 测试使用本机模拟服务，不需要启动 Unity 或调用豆包云服务。`-B` 避免生成新的 Python 字节码缓存。
 
-协议细节见[接口文档](../../../../docs/zh-CN/interface.md)，模块与验证流程见[开发指南](../../../../docs/zh-CN/development.md)，提交修改见[贡献指南](../../../../CONTRIBUTING.md)。
+协议细节见[接口文档](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/zh-CN/interface.md)，模块与验证流程见[开发指南](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/zh-CN/development.md)，提交修改见[贡献指南](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/CONTRIBUTING.md)。
 
 ## 运行日志
 

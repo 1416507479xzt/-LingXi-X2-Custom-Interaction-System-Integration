@@ -2,12 +2,15 @@
 
 当前与环节一、二共用Mini语音Agent，保持--presentation-backend none。模型判断食堂意见和提取原话片段；机器人复述并征求确认，确认后才写入本地JSONL表，网页只读显示。同一待提交记录ID防止重试重复写入；取消不写入。未确认草稿只在当前会话，已确认记录留在机上。
 
+截至2026-11-18，用户已确认第三版语音体验良好、反馈表实时更新，详见[验收记录](2026-11-18-playback-and-feedback-path.md)。
+
 ## 更新
 
 在Windows PowerShell源码目录上传新版离线包；每次重新输入当前机器人Wi-Fi IP。
 
 ```powershell
-cd 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码'
+# 先进入自己电脑上的仓库根目录
+python scripts/build_robot_bundle.py
 $RobotIp = Read-Host '输入机器人当前 Wi-Fi IP'
 scp -O .\dist\eldercare_x2_aarch64_py310.zip "agi@${RobotIp}:/home/agi/eldercare-x2/"
 ```
@@ -43,7 +46,7 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 推荐在Windows电脑双击仓库根目录的`open_dining_dashboard.cmd`，或在电脑PowerShell执行：
 
 ```powershell
-& 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
+.\open_dining_dashboard.cmd
 ```
 
 输入当前机器人IPv4地址；启动器另开SSH窗口，在新窗口自行输入密码。它自动选择18765至18775之间的空闲本地端口，建立仅127.0.0.1监听的SSH转发，并在机器人相同端口启动反馈表，仍读取data/dining_feedback.jsonl。检查HTTP 200及反馈表标题成功后才打开浏览器。请使用自动打开的地址，不继续刷新旧8765页面；保留标注“食堂反馈表 SSH”的窗口。它不停止原语音Agent，不修改原生服务，不复制记录到外网。

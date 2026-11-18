@@ -1,8 +1,10 @@
 # 模型统一决策与真机表现接入
 
+> 下文含仿真及接口设计参考。第三版当前真机命令见[复现指南](reproduce-on-x2.md)，验证范围见[验收状态](aimdk-v1-robot-audio.md)；当前真机表情动作保持关闭，到点主动提醒不开发。
+
 ## Windows 仿真启动
 
-在 `example/x2_agent` 目录运行：
+在 `仓库根目录` 目录运行：
 
 ```powershell
 python agent.py --competition-mode --health-semantic model --presentation-backend unity

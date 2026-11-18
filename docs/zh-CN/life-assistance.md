@@ -1,12 +1,14 @@
 # 第二环节：用药咨询与健康提醒
 
+> 下文含仿真及接口设计参考。第三版当前真机命令见[复现指南](reproduce-on-x2.md)，验证范围见[验收状态](aimdk-v1-robot-audio.md)；当前真机表情动作保持关闭，到点主动提醒不开发。
+
 与第一环节共用程序、对话记忆及语音/表情/动作通道，资料模块独立。
 在 model 模式下，服务请求和后续澄清由大模型理解，使用 other/continue，
 不要求先结束健康问询。唤醒机制不变，先唤醒再提出请求。
 
 ## 启动
 
-在 example/x2_agent 目录中运行：
+在 仓库根目录 目录中运行：
 
 ```powershell
 python agent.py --competition-mode --health-semantic model --presentation-backend unity

@@ -1,5 +1,7 @@
 # 17:17真机连续对话：串话、重试和回顾
 
+> 历史联调记录：保留当时问题、命令和结果。第三版当前状态见[验收汇总](aimdk-v1-robot-audio.md)，实际部署请使用[当前复现指南](reproduce-on-x2.md)。
+
 ## 本轮事实
 
 已部署8b3c8ea对应包，机上model_dialogue.py指纹a90f6eb7e47e906651e034e88d876ec28018176fd15b5d6140a1d03d8a9c5632。AimDK v1.0.0、麦流1、BEGIN起实时ASR、Mini、none表现后端、缺END停收1.5秒。原生交互此前不再回答。日志最后先显示Agent已停止，随后SSH连接被reset；不能把退出后的网络断开当成对话中崩溃。

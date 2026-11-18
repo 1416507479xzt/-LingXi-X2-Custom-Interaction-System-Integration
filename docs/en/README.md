@@ -1,15 +1,17 @@
 # Example voice agent
 
+> Simulation client reference. Run commands at this repository root. For v0.3.0 physical X2 setup and verified scope, see the [reproduction guide](../zh-CN/reproduce-on-x2.md) and [current status](../zh-CN/aimdk-v1-robot-audio.md) (Chinese). Unity, simulator and console belong to the upstream project; external guide links refer to that project.
+
 [中文](../zh-CN/README.md) | **English** | [Français](../fr/README.md)
 
 These Python clients connect to the Unity robot gateway over WebSocket. `agent.py` uses Doubao speech services and Volcengine Ark for conversations and skill calls. `demo.py` checks connections and playback using fixed text and bundled recordings, with a sine-wave fallback for missing or invalid audio.
 
-Commands below run in the repository's `example/x2_agent/` directory using Windows PowerShell. On Linux/macOS, use `python3` if required by your environment; the supplied portable simulator runs on Windows.
+Commands below run in the repository's root directory using Windows PowerShell. On Linux/macOS, use `python3` if required by your environment; the supplied portable simulator runs on Windows.
 
 ## Project layout
 
 This is a self-contained Agent project. It can run without the console and reads its own `.env`.
-The GUI is a separate project; see the [console guide](../../../../docs/en/console.md).
+The GUI is a separate project; see the [console guide](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/console.md).
 
 | Path | Responsibility |
 |---|---|
@@ -29,7 +31,7 @@ The GUI is a separate project; see the [console guide](../../../../docs/en/conso
 
 ## Install and run
 
-Python 3.10+ is required. For real conversations, enable Volcengine Speech (ASR/TTS) and Ark (LLM). In PowerShell, from the repository’s `example/x2_agent/` directory:
+Python 3.10+ is required. For real conversations, enable Volcengine Speech (ASR/TTS) and Ark (LLM). In PowerShell, from the repository’s root directory:
 
 ```powershell
 python -m pip install -r requirements.txt
@@ -37,10 +39,10 @@ python -m pip install -r requirements.txt
 
 Start the robot using one of these routes:
 
-- **Portable simulator:** download and run the Windows EXE from GitHub Releases; follow the [simulator guide](../../../../docs/en/simulator.md).
-- **From the Unity project:** open `unity-agent-playground/` with Unity **2022.3.62f3c1**, open `Assets/X02Competition/Scenes/scene.unity` and press Play; follow the [Unity guide](../../../../docs/en/unity.md).
+- **Portable simulator:** download and run the Windows EXE from GitHub Releases; follow the [simulator guide](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/simulator.md).
+- **From the Unity project:** open `unity-agent-playground/` with Unity **2022.3.62f3c1**, open `Assets/X02Competition/Scenes/scene.unity` and press Play; follow the [Unity guide](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/unity.md).
 
-Both use local port `9002`; run only one robot instance. Then start one Agent from `example/x2_agent/`:
+Both use local port `9002`; run only one robot instance. Then start one Agent from `repository root`:
 
 ```powershell
 python demo.py
@@ -55,7 +57,7 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 python agent.py
 ```
 
-Keep `x2_agent/` beside the entry scripts and run them with the same Python environment used to install dependencies. From the repository root, use `python example/x2_agent/agent.py`; the default configuration remains `example/x2_agent/.env`.
+Keep `x2_agent/` beside the entry scripts and run them with the same Python environment used to install dependencies. From the repository root, use `python agent.py`; the default configuration remains `.env`.
 
 For a remote connection, set `--host <address> --port 9002` and ensure the gateway listens on a reachable network address. Client options alone do not change Unity's default loopback listener.
 
@@ -70,23 +72,23 @@ The phrases below require `agent.py`; the model selects skills from the request.
 - Requests for happy, sad, surprised or other expressions change the robot face. The protocol also includes a neutral expression.
 - **F1** opens the Unity debug panel; its skill buttons work without a cloud key.
 
-The mouth follows speech playback. See the [protocol skill table](../../../../docs/en/interface.md) for skill names and parameters.
+The mouth follows speech playback. See the [protocol skill table](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/interface.md) for skill names and parameters.
 
 The demo’s `--reply` and `--greeting` change captions, not the bundled voice recordings. Audio comes from `x2_agent/greeting.wav` and `x2_agent/tts.wav`, sent in 200 ms chunks.
 
 ## Configuration
 
-Configuration loads at CLI startup, not on import. Precedence: CLI arguments > existing environment variables > `.env` > defaults. Scripts load `.env` from the `example/x2_agent/` project root by default. Use `--env-file` with your configuration file path to override it; a missing file is an error.
+Configuration loads at CLI startup, not on import. Precedence: CLI arguments > existing environment variables > `.env` > defaults. Scripts load `.env` from the `repository root` project root by default. Use `--env-file` with your configuration file path to override it; a missing file is an error.
 
 | Variable | Required for Doubao | Default / meaning |
 |---|---|---|
 | `DOUBAO_SPEECH_API_KEY` | Yes | Speech key shared by ASR and TTS |
 | `ARK_API_KEY` | Yes | Ark LLM key |
 | `DOUBAO_LLM_MODEL` | No | `doubao-seed-2-0-mini-260428` |
-| `DOUBAO_TTS_SPEAKER` | No | `zh_female_wanqudashu_moon_bigtts`; compatible with `seed-tts-1.0` |
-| `DOUBAO_ASR_RESOURCE_ID` | No | `volc.bigasr.sauc.duration` |
+| `DOUBAO_TTS_SPEAKER` | No | `zh_female_vv_uranus_bigtts` (seed-tts-2.0) |
+| `DOUBAO_ASR_RESOURCE_ID` | No | `volc.seedasr.sauc.duration` |
 
-Copy [`.env.example`](../../.env.example) for your local configuration. Keep keys out of Git; the repository [`.gitignore`](../../../../.gitignore) excludes `.env` files.
+Copy [`.env.example`](../../.env.example) for your local configuration. Keep keys out of Git; the repository [`.gitignore`](../../.gitignore) excludes `.env` files.
 
 ## Useful options
 
@@ -100,7 +102,7 @@ to export counters and statistics over the most recent 1000 duration samples per
 metric on normal exit or Ctrl+C. Timing excludes human recording time; a dispatched
 skill counter does not confirm execution. Unity logs still appear in the terminal.
 
-Run these from the repository’s `example/x2_agent/` directory with your virtual environment's Python:
+Run these from the repository’s root directory with your virtual environment's Python:
 
 ```powershell
 python agent.py --help
@@ -134,7 +136,7 @@ The default uploads ASR audio while recording, reuses LLM connections and passes
 
 ## Tests and development
 
-Run from `example/x2_agent/` with the same Python environment used to install dependencies:
+Run from `repository root` with the same Python environment used to install dependencies:
 
 ```powershell
 python -B -m unittest discover -s tests -v
@@ -142,11 +144,11 @@ python -B -m unittest discover -s tests -v
 
 Tests use local mock services without Unity or cloud APIs.
 
-See the [protocol](../../../../docs/en/interface.md), [development guide](../../../../docs/en/development.md) and [contributing guide](../../../../docs/en/CONTRIBUTING.md).
+See the [protocol](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/interface.md), [development guide](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/development.md) and [contributing guide](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/CONTRIBUTING.md).
 
 ## Runtime logs
 
 Unity runtime logs arrive as `agentsdk.runtime.log` on the same connection.
 Both clients display Info, Warning, Error and exception stacks, including during greetings
 and voice rounds. Buffer drops and truncation are reported. See the
-[protocol reference](../../../../docs/en/interface.md) for fields and delivery limits.
+[protocol reference](https://github.com/AgiBot-Community/Unity-Agent-Playground/blob/main/docs/en/interface.md) for fields and delivery limits.

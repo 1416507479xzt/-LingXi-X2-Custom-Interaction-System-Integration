@@ -1,5 +1,7 @@
 # 环节一：迎宾问候与健康问询验收
 
+本页是历史规则模式验收参考；第三版当前真机流程见[复现指南](reproduce-on-x2.md)，当前结果见[验收汇总](aimdk-v1-robot-audio.md)。
+
 注意：本页保留旧 `auto/rules` 模式的验收说明，其中固定开场和固定表现不适用于
 当前默认 `model` 模式。新模式的启动、模型统一决策及AimDK接入边界请见
 [模型统一决策与真机表现接入](model-presentation.md)。
@@ -11,7 +13,7 @@
 保持 Windows 便携版模拟器运行。旧 Agent 终端按 Ctrl+C 退出，然后执行：
 
 ```powershell
-cd "D:\zhejiangshuzhidasai\Unity-Agent-Playground-main\Unity-Agent-Playground-main\example\x2_agent"
+# 在自己电脑的本仓库根目录执行
 python agent.py --competition-mode
 ```
 

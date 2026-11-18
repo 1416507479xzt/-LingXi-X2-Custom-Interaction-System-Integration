@@ -53,7 +53,19 @@ def build(wheelhouse, output):
             raise ValueError("wheel is not universal or CPython 3.10 aarch64: " + wheel.name)
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    manifest = {"target": "Linux aarch64 / CPython 3.10 / AimDK v1.0.0 or v1.1.0 audio profile",
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    try:
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL).strip()
+        dirty = bool(subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip())
+    except (OSError, subprocess.CalledProcessError):
+        revision, dirty = None, None
+    manifest = {"version": version, "source_revision": revision,
+                "source_dirty": dirty,
+                "target": "Linux aarch64 / CPython 3.10 / AimDK v1.0.0 or v1.1.0 audio profile",
                 "wheels": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                            for p in wheels},
                 "source_files": {}}
@@ -69,7 +81,9 @@ def build(wheelhouse, output):
         source = ([ROOT / "agent.py", ROOT / "feedback_dashboard.py",
                    ROOT / "README.md", ROOT / ".env.example",
                    ROOT / "LICENSE", ROOT / "skills.yaml",
-                   ROOT / "requirements-lock.txt",
+                   ROOT / "requirements-lock.txt", ROOT / "VERSION",
+                   ROOT / "CHANGELOG.md", ROOT / "open_dining_dashboard.cmd",
+                   ROOT / "scripts" / "open_dining_dashboard.ps1",
                    ROOT / "scripts" / "aimdk_mic_probe.py",
                    ROOT / "scripts" / "aimdk_asr_probe.py",
                    ROOT / "scripts" / "aimdk_asr_diagnostic.py",
@@ -79,9 +93,10 @@ def build(wheelhouse, output):
                    ROOT / "docs" / "zh-CN" / "onsite-deployment.md",
                    ROOT / "docs" / "zh-CN" / "reproduce-on-x2.md",
                    ROOT / "docs" / "zh-CN" / "aimdk-v1-robot-audio.md"] +
+                  sorted((ROOT / "docs").rglob("*.md")) +
                   sorted((ROOT / "x2_agent").glob("*.py")) +
                   sorted((ROOT / "data").glob("*.json")))
-        for path in source:
+        for path in dict.fromkeys(source):
             relative = path.relative_to(ROOT).as_posix()
             content = path.read_bytes()
             put(relative, content)

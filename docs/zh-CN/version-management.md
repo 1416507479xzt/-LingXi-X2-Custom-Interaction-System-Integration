@@ -8,9 +8,9 @@ Git每次commit本来就保留历史。标签给某个已验证提交起固定�
 |---|---|---|
 | v0.1.0 | 首次真机完整语音基线 | 问候+疲惫回答完整播出，速度与表达仍较差 |
 | v0.2.0 | 实时ASR提速基线 | 实时上传，两轮完整播出、用户反馈更快；仍非全赛题验收 |
-| main容器候选 | 后续开发 | 758b377构建出ARM64镜像并通过56项离线测试；容器真机通信未验收 |
+| v0.3.0（第三版，当前） | 完整语音与食堂反馈闭环基线 | 164项相关离线回归通过；用户确认语音体验良好及食堂网页实时更新；动作和容器真机未验收 |
 
-版本含义约定：PATCH为兼容修复，MINOR为新功能/明确验收节点，MAJOR为不兼容部署或接口变更。0.x阶段仍在开发。候选版本以后可使用v0.3.0-rc.1，正式验收后再标v0.3.0。不移动已推送的标签来覆盖旧内容，有错发新版本。
+版本含义约定：PATCH为兼容修复，MINOR为新功能/明确验收节点，MAJOR为不兼容部署或接口变更。0.x阶段仍在开发。后续版本可使用候选标签（如v0.4.0-rc.1），完成该版本约定范围后再发布正式标签。不移动已推送的标签来覆盖旧内容，有错发新版本。
 
 ## 查看与对比
 
@@ -20,11 +20,11 @@ Git每次commit本来就保留历史。标签给某个已验证提交起固定�
 git fetch origin --tags
 git tag --list
 git log --oneline --decorate -15
-git diff --stat v0.1.0 v0.2.0
-git diff v0.1.0 v0.2.0 -- x2_agent/aimdk_transport.py
+git diff --stat v0.2.0 v0.3.0
+git diff v0.2.0 v0.3.0 -- x2_agent/aimdk_playback.py
 ```
 
-GitHub页面也可直接对比：[v0.1.0到v0.2.0](https://github.com/1416507479xzt/-X2-/compare/v0.1.0...v0.2.0)。CHANGELOG.md记录功能、已知问题和验证边界，详细测试结果在docs/zh-CN。
+GitHub页面也可直接对比：[第二版到第三版](https://github.com/1416507479xzt/-X2-/compare/v0.2.0...v0.3.0)。CHANGELOG.md记录功能、已知问题和验证边界，详细测试结果在docs/zh-CN。
 
 ## 独立运行旧版本
 
@@ -46,4 +46,6 @@ git worktree add --detach ..\eldercare-v0.1.0 v0.1.0
 
 Git保存源码标签和构建定义；镜像仓库或离线tar保存镜像。实际发布时使用同名版本的镜像标签，并记录不可变digest和Git提交。Dockerfile支持APP_VERSION与VCS_REF构建参数，写入镜像标签元数据。不要只发一个不断覆盖的latest，也不要把Key写进构建参数或镜像。
 
-目前v0.1.0/v0.2.0是早于Docker定义的真机语音基线；这些标签没有Dockerfile。Docker候选方案在main开发，不能宣称这两个版本已有官方发布镜像。容器构建和真机验收后再发布对应容器版本，见[容器复现说明](docker-reproduction.md)。
+目前v0.1.0/v0.2.0是早于Docker定义的真机语音基线；这些标签没有Dockerfile。Docker候选方案在main开发，不能宣称这两个版本已有官方发布镜像。v0.3.0包含容器构建定义，但此前758b377构建的镜像不含第三版后续代码，不能冒充v0.3.0镜像；按第三版源码重新构建并完成容器真机验收后再发布对应镜像，见[容器复现说明](docker-reproduction.md)。
+
+第三版详细范围与复测方法见[发布说明](releases/v0.3.0.md)。源码 VERSION、Git 标签与离线包清单一起标识交付版本；旧机器人上的包不会因 Git 推送自动更新。

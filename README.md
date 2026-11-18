@@ -2,6 +2,8 @@
 
 本项目将长者陪护对话接入灵犀 X2 真机：AimDK 提供麦克风、扬声器、表情和预设动作接口；豆包语音服务完成 ASR/TTS；火山方舟上的 Doubao-Seed 模型负责语义理解、回答和受约束的表现选择。迎宾健康问询、生活协助与社区食堂意见共用一套会话逻辑。Unity 仿真用于回归对照，真机通过独立传输适配层运行同一套业务代码。
 
+当前版本：**[v0.3.0（第三版）](docs/zh-CN/releases/v0.3.0.md)**。源码版本见 VERSION；与第二版的变化见[版本对比](https://github.com/1416507479xzt/-X2-/compare/v0.2.0...v0.3.0)。
+
 ## 从另一台电脑开始
 
 版本节点、比较和旧版复测见[版本管理说明](docs/zh-CN/version-management.md)及[CHANGELOG](CHANGELOG.md)。ARM64 Docker候选镜像已通过云端构建、依赖检查及56项离线测试；下载和验证范围见[首次容器构建记录](docs/zh-CN/2026-11-18-container-build.md)及[容器复现说明](docs/zh-CN/docker-reproduction.md)。尚未完成容器真机验收，当前真机ZIP方案继续保留。
@@ -11,6 +13,7 @@
 ```powershell
 git clone https://github.com/1416507479xzt/-X2-.git
 Set-Location .\-X2-
+git checkout --detach v0.3.0
 python scripts/build_robot_bundle.py --download-wheels
 python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
 ```

@@ -4,6 +4,8 @@ Dockerfile、Compose配置与启动脚本已纳入Git。镜像包含项目业务
 
 已完成Bash语法及构建上下文检查；云端实际运行docker build、镜像help入口、Python/ROS/应用导入、缺少SDK时拒绝启动、56项离线测试及docker compose config。目标机器的AimDK SDK、共享库、DDS发现和真实收音播音仍须验收，不能据此宣称一键复现完整机器人效果。
 
+第三版 v0.3.0 发布的是源码与 ZIP 复现基线。上面已构建候选镜像来自历史提交 758b377，不含第三版后续修正；需要按 v0.3.0 重新构建，不能将旧镜像改标签当作本版交付。
+
 ## 与当前机器人版本的关系
 
 手头机器已知AimDK v1.0.0、aarch64、Python 3.10。官方v1.0.0 FAQ说明开发沙盒暂不支持Docker；不能直接在机器人安装Docker或更改原生系统。新版[官方容器开发流程](https://x2-aimdk.agibot.com/zh-cn/latest/quick_start/container_dev.html)使用Podman与对应机器人环境，版本要求以目标机器官方说明为准。它的基础镜像、SDK挂载和宿主共享库处理并不等于通用Docker镜像可直接套用。
