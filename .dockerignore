@@ -1,0 +1,25 @@
+# Only the application allowlist enters the image build context.
+**
+!Dockerfile
+!requirements-lock.txt
+!agent.py
+!feedback_dashboard.py
+!skills.yaml
+!LICENSE
+!README.md
+!.env.example
+!x2_agent/
+!x2_agent/*.py
+!data/
+!data/life_assistance.json
+!data/medicine-education.json
+!data/medicine-template.json
+!scripts/
+!scripts/robot_preflight.py
+!scripts/run_robot_agent.py
+!scripts/aimdk_mic_probe.py
+!scripts/aimdk_asr_probe.py
+!scripts/aimdk_asr_diagnostic.py
+!scripts/aimdk_tts_probe.py
+!docker/
+!docker/entrypoint.sh

@@ -1,0 +1,33 @@
+name: eldercare-x2
+services:
+  robot:
+    image: ${ELDERCARE_IMAGE:-eldercare-x2:dev}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/arm64
+    network_mode: host
+    ipc: host
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=256m,mode=1777
+    environment:
+      # Deliberate per-session confirmation, not persisted in the image.
+      X2_ONLY_VOICE_CONFIRMED: "${X2_ONLY_VOICE_CONFIRMED:-0}"
+      ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"
+    volumes:
+      - type: bind
+        source: ${X2_SDK_DIR:-/home/agi/aimdk}
+        target: /home/agi/aimdk
+        read_only: true
+      - type: bind
+        source: ${ELDERCARE_ENV_FILE:-./.env}
+        target: /opt/eldercare/.env
+        read_only: true
+      - records:/var/lib/eldercare
+    # Run compatibility checks first; opt in to agent explicitly.
+    command: ["preflight"]
+    restart: "no"
+volumes:
+  records:

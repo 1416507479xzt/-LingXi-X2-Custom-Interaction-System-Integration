@@ -22,6 +22,9 @@ dist/
 vendor/
 *.whl
 *.zip
+*.tar
+*.tar.gz
+*.oci
 
 # Runtime logs, recordings, and collected feedback
 *.log
