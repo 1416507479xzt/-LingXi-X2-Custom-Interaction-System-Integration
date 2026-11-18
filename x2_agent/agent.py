@@ -203,6 +203,7 @@ class DoubaoAgent:
         self._llm_warm = None
 
     def warm_connections(self):
+        self.llm.start_keepalive(self.args.ark_key)
         if self._llm_warm is None or self._llm_warm.done():
             async def prepare_llm():
                 try:
