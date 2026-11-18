@@ -11,6 +11,48 @@ def result(text):
 
 
 class QualityTests(unittest.IsolatedAsyncioTestCase):
+    def test_existing_caring_close_is_not_appended_again(self):
+        draft = dict(intent="health", action="close",
+            reply="已经有一点影响日常活动了，您多留意身体状态，有其他不适随时告诉我。",
+            emotion=None, gesture=None)
+        revised = ensure_interview_closing(draft, {"interview_active": True, "health_rounds": 1})
+        self.assertEqual(revised["reply"], draft["reply"])
+
+    async def test_fatigue_question_with_can_tell_me_is_not_mistaken_for_advice(self):
+        memory = ModelDialogue()
+        memory.begin()
+        calls = []
+
+        async def stream(*args, **kwargs):
+            calls.append(1)
+            yield "text", json.dumps(dict(intent="health", action="followup",
+                reply="您可以先告诉我这种疲惫影响做事了吗？",
+                emotion=None, gesture=None), ensure_ascii=False)
+
+        answer = await generate_dialogue(SimpleNamespace(stream=stream), "我今天有点疲惫",
+            {**memory.context(), "capabilities": capabilities()}, "m", "k")
+        self.assertEqual(len(calls), 1)
+        self.assertIn("保持规律的作息", answer["reply"])
+        self.assertNotIn("fatigue_question_without_practical_tip",
+                         review_flags(answer, [], "我今天有点疲惫"))
+
+    async def test_registration_only_early_close_is_still_rejected(self):
+        memory = ModelDialogue()
+        memory.begin()
+        calls = []
+
+        async def stream(*args, **kwargs):
+            calls.append(1)
+            yield "text", json.dumps(dict(intent="health", action="close",
+                reply="了解您现在的疲惫感啦。", emotion=None, gesture=None),
+                ensure_ascii=False)
+
+        # A registration-only reply must still be rejected rather than
+        # manufactured into a successful answer.
+        answer = await generate_dialogue(SimpleNamespace(stream=stream), "我今天有点疲惫",
+            {**memory.context(), "capabilities": capabilities()}, "m", "k")
+        self.assertIsNone(answer)
+
     async def test_question_only_waist_opening_gets_practical_tip_in_one_call(self):
         memory = ModelDialogue()
         memory.begin()

@@ -37,7 +37,7 @@ GESTURES = {None, *MOTIONS}
 _REGISTER_PREFIX = re.compile(
     r"^(?:好的[，,]\s*)?(?:"
     r"我(?:已经|都|也)?(?:记下|记录下)(?:了|啦|您|你)[^，,。！？!?\n]{0,60}"
-    r"|我(?:已经)?(?:了解|知道)(?:您|你)[^，,。！？!?\n]{0,60}"
+    r"|(?:我)?(?:已经)?(?:了解|知道)(?:您|你)[^，,。！？!?\n]{0,60}"
     r"|(?:您|你)[^，,。！？!?\n]{0,50}我(?:已经|都|也)?(?:记下|记录下)(?:了|啦)?"
     r")(?:[，,。]\s*|$)"
 )
@@ -61,7 +61,7 @@ def remove_registration_prefix(reply):
 
 
 _CARE_ENDING = "今天先照顾好自己，有需要再叫我。"
-_CARE_ENDING_PATTERN = re.compile(r"有需要|随时(?:叫|找|和我说)|再叫我|照顾好自己|保重|祝您")
+_CARE_ENDING_PATTERN = re.compile(r"有需要|随时(?:叫|找|和我说|告诉我)|再叫我|照顾好自己|保重|祝您")
 _URGENT_REPLY_PATTERN = re.compile(r"立即|马上|现在联系.{0,8}医护|及时就医|急救")
 
 
@@ -109,7 +109,8 @@ def ensure_fatigue_practical_tip(result, utterance, context):
     reply = result["reply"]
     before_question = re.split(r"[？?]", reply, maxsplit=1)[0]
     if ("。" in before_question or "！" in before_question
-            or re.search(r"可以|可试|试着|先|建议|保持|适当", before_question)):
+            or re.search(r"规律.{0,6}(?:作息|睡眠)|睡前.{0,15}(?:放松|阅读|音乐)|睡眠环境",
+                         before_question)):
         return result
     tip = "听您说今天感觉疲惫，可以试着保持规律的作息。"
     return {**result, "reply": tip + reply} if len(tip) + len(reply) <= MAX_REPLY else result
@@ -444,7 +445,7 @@ def validate_reply(text, context, *, diagnostics=None, degrade_presentation=Fals
 
 
 async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=8.0):
-    """At most two model calls within one deadline; no actuation on failure.
+    """Bounded model calls within one deadline; no actuation on failure.
 
     External cancellation propagates. This function does not mutate session
     memory; the caller's existing TTS transaction rolls back committed state.
@@ -480,6 +481,10 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
         if not greeting:
             if context.get("interview_active") and context.get("health_rounds", 0) == 0:
                 prompt += "\n当前是开场第一轮。用户回答今日状态（包括‘还可以’）时必须health/followup，先承接状态再问一个健康相关问题，不用acknowledge。"
+                prompt += ("生活建议直接说做法，最多一项；依据care_reference选择，"
+                           "如疲惫可把泛泛的‘规律作息’讲具体为睡前安排阅读或轻松音乐等放松活动，"
+                           "不推定病因，不保证效果。不重复‘您说疲惫/了解疲惫感/我记下了’等确认。"
+                           "一句建议加一个相关问句即可，不为了表达共情再复述一遍症状。")
             elif context.get("interview_active"):
                 prompt += ("\n当前是开场第二轮，health必须close且不能提问；先回应本轮新增事实，不重复上一轮的生活建议，再自然关怀结束。"
                            "若上一轮问疲惫是否影响活动，老人答‘有一点’，应承接‘已经有点影响’，不要夸成严重，别只念泛泛的就医提示；"
@@ -587,6 +592,10 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
             message_payload = json.dumps(review_data, ensure_ascii=False)
         else:
             message_payload = payload
+        if not greeting:
+            prompt += ("\n输出契约：intent和action各自只能是一个上述英文枚举值，"
+                       "不能把health/followup写进同一个字段，不能输出中文值或数组。"
+                       "reply是字符串；emotion、gesture分别为capabilities中的单个名称或JSON null。")
         messages = [{"role": "user", "content": message_payload}]
         if not greeting:
             # Keep the actual current request last, not buried before reference
@@ -616,9 +625,9 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
             result = validate_reply("".join(chunks), context, diagnostics=diagnostic,
                                     degrade_presentation=True)
             if result:
+                result = ensure_opening_followup(result, utterance, context)
                 result = ensure_fatigue_practical_tip(result, utterance, context)
                 result = ensure_neck_back_practical_tip(result, utterance, context)
-                result = ensure_opening_followup(result, utterance, context)
             if result and result["intent"] == "dining":
                 dining, error = prepare_dining_transition(result["reply"], context.get("pending_dining"), utterance)
                 if error:
@@ -724,7 +733,7 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                     logger.info("模型表现降级 dropped=%s（仅取消该项执行，保留合规回答）",
                                 ",".join(diagnostic["dropped"]))
                 if attempt:
-                    logger.info("模型修正成功 attempt=2")
+                    logger.info("模型修正成功 attempt=%d", attempt + 1)
                 if not greeting and result["intent"] != "dining":
                     result = suppress_repeated_question(result, context.get("verbatim_turns", []), utterance)
                     result = suppress_repeated_advice(result, context.get("verbatim_turns", []), utterance)

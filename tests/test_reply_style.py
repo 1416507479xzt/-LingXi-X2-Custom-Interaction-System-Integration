@@ -15,6 +15,7 @@ class ReplyStyleTests(unittest.IsolatedAsyncioTestCase):
             "我了解您现在腰部也不舒服，多留意腰部的状态。": "多留意腰部的状态。",
             "我知道您现在肚子不舒服了。这样多久了？": "这样多久了？",
             "我记下了。": "",
+            "了解您现在的疲惫感啦。您今天的疲惫影响做事了吗？": "您今天的疲惫影响做事了吗？",
         }
         for original, expected in cases.items():
             with self.subTest(original=original):
