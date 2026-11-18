@@ -19,7 +19,7 @@ python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
 
 ## 当前验证状态
 
-最新现场进展见[2026-11-18 ASR 完整性排查](docs/zh-CN/2026-11-18-x2-asr-diagnosis.md)：已再次切换 only_voice，正在核对音频截断；诊断工具已修复云端识别等待期间暂停 ROS 收音的问题，待真机复测。
+最新现场进展见[2026-11-18 ASR 完整性排查](docs/zh-CN/2026-11-18-x2-asr-diagnosis.md)：已再次切换 only_voice；修复诊断工具的收音间隙后，两条普通完整语句已在真机准确转写。静默时仍偶有 VAD 片段，“灵犀灵犀”被识别为“梅西梅西”，唤醒尚未通过；ASR 热词增强仍待核对和实现。
 
 手头一台 AimDK v1.0.0 的 X2 已实测麦克风 VAD PCM、普通短句 ASR、云端 TTS 和优先级 6 的机器人扬声器完整播报及焦点释放；更新后的离线依赖预检也已通过。完整 Agent 能接收麦克风音频，但本轮唤醒词没有被 ASR 正确转写，尚未进入 Mini 推理，因此完整对话、表情动作及赛方统一机器人的运行仍待验收。v1.1.0 音频参数依据官方文档做了静态适配，尚未实机验证。详见[当前验收状态](docs/zh-CN/aimdk-v1-robot-audio.md)及[2026-11-08 真机联调记录](docs/zh-CN/2026-11-08-x2-real-robot-integration.md)。
 
