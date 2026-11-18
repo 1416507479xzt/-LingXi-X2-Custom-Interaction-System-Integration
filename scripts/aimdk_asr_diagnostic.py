@@ -9,7 +9,7 @@ import array
 import asyncio
 import os
 from pathlib import Path
-from collections import deque
+from collections import Counter, deque
 import sys
 import time
 
@@ -80,16 +80,29 @@ def main(argv=None):
 
     collector = VadAssembler(stream_id=args.stream_id)
     pending = deque()
+    states = Counter()
+    received_bytes = Counter()
+    complete_count = 0
     rclpy.init()
     node = rclpy.create_node("eldercare_asr_diagnostic")
     qos = QoSProfile(depth=50, reliability=ReliabilityPolicy.BEST_EFFORT,
                      durability=DurabilityPolicy.VOLATILE)
 
     def on_audio(msg):
+        nonlocal complete_count
+        states[(msg.stream_id, msg.audio_vad_state.value)] += 1
+        received_bytes[msg.stream_id] += len(msg.audio_data)
         if msg.stream_id == args.stream_id and msg.audio_vad_state.value == 1:
-            print("VAD BEGIN：检测到新片段（不代表已正确识别说话内容）。", flush=True)
+            print("VAD BEGIN：本包%d字节；请连续说完目标句，随后安静等待。" %
+                  len(msg.audio_data), flush=True)
+        if (msg.stream_id == args.stream_id and msg.audio_vad_state.value == 2 and
+                states[(msg.stream_id, 2)] == 1):
+            print("VAD PROCESSING：已收到后续音频。", flush=True)
+        if msg.stream_id == args.stream_id and msg.audio_vad_state.value == 3:
+            print("VAD END：收到片段结束事件。", flush=True)
         segment = collector.feed(msg.stream_id, msg.audio_vad_state.value, msg.audio_data)
         if segment is not None and segment.pcm:
+            complete_count += 1
             if len(pending) >= 4:
                 pending.popleft()
                 print("诊断积压超过4段，丢弃最旧片段；本轮需重新对照。", flush=True)
@@ -128,6 +141,9 @@ def main(argv=None):
     except KeyboardInterrupt:
         print("用户停止诊断。", flush=True)
     finally:
+        print("VAD统计：%s；各流总字节=%s；完整非空片段=%d；超长丢弃=%d" %
+              (dict(states), dict(received_bytes), complete_count, collector.discarded),
+              flush=True)
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
