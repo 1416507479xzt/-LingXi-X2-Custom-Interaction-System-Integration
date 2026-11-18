@@ -1,34 +1,81 @@
-# 环节四：社区食堂膳食意见收集
+# 环节四：社区食堂膳食意见收集（真机纯语音）
 
-这项功能与环节一、二共用同一个语音 Agent。模型判断用户是否在反馈食堂饭菜、口味或服务，并选择表情和安全的动作。程序核对模型提取的内容是否出现在老人原话中；复述后只有听到明确确认，才写入本地结构化食堂反馈表。取消或普通聊天不会写入。
+当前与环节一、二共用Mini语音Agent，保持--presentation-backend none。模型判断食堂意见和提取原话片段；机器人复述并征求确认，确认后才写入本地JSONL表，网页只读显示。同一待提交记录ID防止重试重复写入；取消不写入。未确认草稿只在当前会话，已确认记录留在机上。
 
-## 启动
+## 更新
 
-保持仿真机器人运行，在 `example/x2_agent/` 目录启动原来的 Agent：
-
-```powershell
-python agent.py --competition-mode --health-semantic model
-```
-
-另开一个 PowerShell，仍在 `example/x2_agent/` 目录运行本机只读反馈表：
+在Windows PowerShell源码目录上传新版离线包；每次重新输入当前机器人Wi-Fi IP。
 
 ```powershell
-python feedback_dashboard.py
+cd 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码'
+$RobotIp = Read-Host '输入机器人当前 Wi-Fi IP'
+scp -O .\dist\eldercare_x2_aarch64_py310.zip "agi@${RobotIp}:/home/agi/eldercare-x2/"
 ```
 
-浏览器打开 `http://127.0.0.1:8765/`。页面显示已确认记录，刷新即可看到新增意见。数据保存在 `data/dining_feedback.jsonl`；首次确认前文件不存在。可用 `--dining-feedback-records` 给 Agent 指定另一个记录路径，并给反馈表脚本用 `--records` 指定同一路径。
+显示100%后，使用原SSH窗口；若已断线，在PowerShell执行ssh "agi@${RobotIp}"重新登录。看到agi@agi提示符后执行：
 
-这个地址只访问本机，不需要 VPN。`agent.py` 不会自动启动网页服务；运行 `feedback_dashboard.py` 的 PowerShell 窗口需要保持打开。如果网页提示无法连接，先检查该窗口是否仍在运行，并确认使用的是 `http://127.0.0.1:8765/`（不是 HTTPS）。
+```bash
+cd /home/agi/eldercare-x2
+python3 -m zipfile -e eldercare_x2_aarch64_py310.zip .
+cd eldercare_x2
+source /home/agi/aimdk/install/local_setup.bash
+python3 scripts/robot_preflight.py
+```
 
-## 演示话术
+旧Agent先Ctrl+C停止。新版不会自动改机器人原生模式；保持此前已验证的only_voice。API Key自动读取机上.env，不会因解压包覆盖。
 
-1. 唤醒并完成环节一后，说：“食堂今天的青菜太咸，下次少放盐。”机器人应复述意见并问是否记入反馈表；此时表里没有新记录。
-2. 说：“不是青菜，是汤太咸。”机器人应以“汤”为准，再次征求确认；仍不写入。
-   若语音识别把“汤”写成“糖”，机器人会先核对菜名。此时即使说“确认提交”也不会写入；请明确再说“是汤，汤太咸了”。先前未撤回的“少放盐”期望会保留。
-3. 说：“确认提交。”机器人确认已记入，反馈表新增一行，包含提交时间、类别、菜品或对象、感受、期望和状态。
-   “要记录”也可以确认。若说“有点咸”，复述与记录应保持“有点咸”，不能升级成“太咸”。
-4. 再说：“食堂以后能做清蒸鱼吗？”机器人应作为想吃的菜复述；说“不提交了”则取消，表中不增加记录。
+## PC2启动Agent
 
-复述时“今天的汤有点咸”只能作为问题，不能变成“希望汤有点咸”。如果没有说出希望食堂如何调整，期望栏留空。
+在机器人项目目录执行，记录到单独测试文件，避免混入正常意见。该文件可能保留之前的测试行；请先记下已有行数，本轮应新增两条，不需要删除旧数据。
 
-也可以在环节一、二之间穿插食堂话题。未确认的意见只保存在当前会话，重启 Agent 后不保留。确认记录留在本机文件中，便于比赛展示数据流转；目前尚未接入外部社区服务中心或自动发送平台。不要在演示中录入真实姓名和敏感健康信息。仿真与真机共用这段 Python 对话和存储逻辑，但真机语音、动作及现场网络仍需实测。
+```bash
+mkdir -p logs
+SESSION_ID=$(date +%Y%m%d_%H%M%S)
+export DOUBAO_ASR_HOTWORDS='["灵犀"]'
+export X2_ONLY_VOICE_CONFIRMED=1
+python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend none --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback_stage4_test.jsonl --log-file "logs/voice_${SESSION_ID}.log" --metrics-file "logs/voice_${SESSION_ID}_metrics.json"
+```
+
+结束Ctrl+C后：`unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS`。到点主动提醒不在开发范围，本流程不会启用它，也不执行表情动作。
+
+## 电脑查看机器人反馈表
+
+保留Agent SSH窗口。另开一个Windows PowerShell，变量不会从旧窗口自动继承，要重新输入IP。下面一条SSH同时建立端口转发、在机器人上运行本机网页服务：
+
+```powershell
+$RobotIp = Read-Host '输入机器人当前 Wi-Fi IP'
+ssh -t -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L 8765:127.0.0.1:8765 "agi@${RobotIp}" "cd /home/agi/eldercare-x2/eldercare_x2 && python3 -u feedback_dashboard.py --records data/dining_feedback_stage4_test.jsonl --port 8765"
+```
+
+自行输入SSH密码。看到本地反馈表地址后，在电脑浏览器打开 **http://127.0.0.1:8765/**，使用HTTP而非HTTPS。保持这个PowerShell窗口打开，刷新页面查看新增记录。
+
+网页读的是机器人文件，通过SSH隧道传到电脑；不是读取Windows项目目录里的另一份JSONL。网页访问本身不需要VPN，模型仍需要云端网络。若转发端口已被其他程序占用，可仅把-L后的本地端口改成8766:127.0.0.1:8765，浏览器改访问http://127.0.0.1:8766/。若机器人8765端口已被占用，先核对是否已有同一反馈表服务，不要盲目启动第二个。连接断开或服务停止时网页无法访问，应恢复该窗口，不是修改机器人原生服务。
+
+## 真机测试输入
+
+先“你好灵犀”完成正常开场，每句等实际说完后再继续：
+
+1. 今天食堂的汤有点咸，希望下次少放盐。应复述并征求确认，页面还不增加记录，“有点咸”不能变成“太咸”。
+2. 对，就这样记录。应保存一条口味意见；刷新页面核对汤、有点咸、少放盐。
+3. 食堂以后能做清蒸鱼吗？应作为想吃的菜征求确认，不假称今天已有该菜。
+4. 好的，记下来吧。应新增第二条菜品愿望。
+5. 今天食堂的菜有点辣。应征求确认，不沿用旧的“汤”或“清蒸鱼”作菜名。
+6. 这条先不提交了。取消，不新增第三条记录。
+
+可选边界测试：问“今天食堂有什么菜”，没有菜单资料时应说明无资料，不编造菜单；没有待确认意见时说“确认提交”，应说明暂无待确认内容，不写入。
+
+用户提出更正时仍可修改待确认内容，但纠正不是本轮比赛必测项；同音不确定时保留现有菜名核对。涉及用药或急迫健康求助时优先处理，不作为食堂意见写入。
+
+## 记录和范围
+
+记录字段包括提交时间、类别、菜品/对象、感受、期望和状态。只有程序成功保存才回复已经记入；保存失败不谎报成功。愿望菜名必须来自原话，若模型将“能做清蒸鱼吗”改写成不在原话中的“想吃清蒸鱼”，短请求保留原句作为期望，而不是伪造逐字引述。
+
+这是本地结构化表及网页查看闭环，尚未对接外部社区服务中心API，不承诺意见已采纳、菜单已更改或已发送外部平台。不要把真实老人资料加入测试记录或Git；JSONL默认被忽略。
+
+开发电脑复现合成文本/存储/真实HTTP闭环：
+
+```powershell
+python scripts/check_dining_voice_live.py --live --output logs/stage4_voice_check.json
+```
+
+需要自备云端Key并会产生模型调用费用；使用临时目录，结束后删除合成记录，不接触真实反馈表。不包含麦克风、TTS、机器人或跨机SSH隧道验收。最后结果见[开发检查记录](2026-11-18-stage4-real-voice-preparation.md)。

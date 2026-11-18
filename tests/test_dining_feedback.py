@@ -31,6 +31,19 @@ class DiningFeedbackTests(unittest.IsolatedAsyncioTestCase):
             self.memory.commit(utterance, result, dining_records_path=self.path)
         return result
 
+    async def test_confirmation_without_draft_explains_state_without_retry_or_write(self):
+        calls = []
+        async def stream(*args, **kwargs):
+            calls.append(1)
+            yield "text", json.dumps(dict(intent="dining", action="continue", reply="[[DINING_CONFIRM]]", emotion=None, gesture=None))
+        result = await generate_dialogue(SimpleNamespace(stream=stream), "确认提交。",
+            {**self.memory.context(), "capabilities": capabilities(backend="none")}, "model", "key")
+        self.memory.commit("确认提交。", result, dining_records_path=self.path)
+        self.assertEqual(len(calls), 1)
+        self.assertIn("没有待确认", result["reply"])
+        self.assertEqual(load_feedback(self.path), [])
+        self.assertIsNone(self.memory.pending_dining)
+
     async def test_prepare_confirmation_writes_once_and_session_clears(self):
         first = await self.turn("食堂青菜太咸，下次少放盐", "dining",
                                 "[[DINING_PREPARE|taste|青菜|太咸|少放盐]]")
@@ -145,3 +158,36 @@ class DiningFeedbackTests(unittest.IsolatedAsyncioTestCase):
         reply = self.memory.commit("确认提交", result, dining_records_path=blocked)
         self.assertIn("没保存成功", reply.text)
         self.assertIsNotNone(self.memory.pending_dining)
+
+
+class NaturalConfirmationTests(unittest.TestCase):
+    def test_explicit_short_spoken_confirmations_are_accepted(self):
+        for text in ("对，就这样记录。", "好的，记下来吧。", "就这样记录吧", "帮我记下来吧"):
+            with self.subTest(text=text):
+                prepared, _ = prepare_transition("[[DINING_PREPARE|taste|汤|有点咸|少放盐]]", None, "食堂汤有点咸，少放盐")
+                result, error = prepare_transition("[[DINING_CONFIRM]]", prepared["pending"], text)
+                self.assertIsNone(error)
+                self.assertEqual(result["save"]["observation"], "有点咸")
+
+    def test_negation_correction_and_questions_cannot_confirm_old_feedback(self):
+        prepared, _ = prepare_transition("[[DINING_PREPARE|taste|汤|有点咸|少放盐]]", None, "食堂汤有点咸，少放盐")
+        for text in ("不要记录", "好的，但是不是汤，是青菜", "对，就这样记录吗？", "好的，不过先别记录", "我已经吃过药了", "对，就这样记录，改成不咸"):
+            with self.subTest(text=text):
+                result, error = prepare_transition("[[DINING_CONFIRM]]", prepared["pending"], text)
+                self.assertIsNone(result)
+                self.assertEqual(error, "dining_confirmation_not_explicit")
+
+
+class DishWishGroundingTests(unittest.TestCase):
+    def test_polite_dish_request_keeps_original_words_instead_of_model_paraphrase(self):
+        original = "食堂以后能做清蒸鱼吗？"
+        result, error = prepare_transition("[[DINING_PREPARE|dish_request|清蒸鱼|-|想吃清蒸鱼]]", None, original)
+        self.assertIsNone(error)
+        self.assertEqual(result["pending"]["item"], "清蒸鱼")
+        self.assertEqual(result["pending"]["request"], original)
+        self.assertNotIn("save", result)
+
+    def test_item_not_in_user_words_is_still_rejected(self):
+        result, error = prepare_transition("[[DINING_PREPARE|dish_request|清蒸鱼|-|想吃清蒸鱼]]", None, "食堂能做红烧肉吗？")
+        self.assertIsNone(result)
+        self.assertEqual(error, "dining_unsupported_detail")

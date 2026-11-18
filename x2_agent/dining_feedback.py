@@ -11,12 +11,17 @@ LOCAL_TIME = timezone(timedelta(hours=8))
 DEFAULT_RECORDS = Path(__file__).resolve().parents[1] / "data" / "dining_feedback.jsonl"
 PLAN = re.compile(r"^\[\[DINING_(PREPARE|CONFIRM|CANCEL)(?:\|([^\]\n]*))?\]\]$")
 KINDS = {"taste": "口味意见", "dish_request": "想吃的菜", "service": "食堂服务", "other": "其他意见"}
-CONFIRM = re.compile(r"\s*(?:确认(?:提交)?|提交(?:吧)?|好(?:的)?(?:，?提交吧)?|可以(?:提交)?|是的|没错|对(?:的)?|嗯，?提交吧|(?:要|请|帮我)?(?:记录|记下|记入)(?:吧|一下)?)\s*[，。！!]?\s*")
+CONFIRM = re.compile(
+    r"\s*(?:确认(?:提交)?|提交(?:吧)?|好(?:的)?(?:，?提交吧)?|可以(?:提交)?|是的|没错|对(?:的)?|嗯，?提交吧|"
+    r"(?:要|请|帮我)?(?:记录|记下|记入|记下来)(?:吧|一下)?|"
+    r"(?:(?:对(?:的)?|是的|没错|好(?:的)?|可以)[，,]?)?(?:就这样|就是这样)?"
+    r"(?:请|帮我)?(?:记录|记下|记下来|提交)(?:吧|一下)?)\s*[，。！!]?\s*")
 
 DINING_PROMPT = """
 环节四食堂意见收集：只有用户明确谈社区食堂的口味、饭菜、想吃的菜或服务反馈时，才使用intent=dining/action=continue。
 不要把健康问询、药品服法、饮水提醒或普通闲聊误判为食堂意见；涉及用药或急迫健康求助时优先处理健康需求。不要建议具体疾病饮食疗法。
 只问“今天食堂有什么菜”等信息、没有表达意见时，使用other；没有菜单资料不要编造菜品。没有pending_dining时，单独说“确认”也不是食堂确认。
+明确询问菜单时直接说明目前没有菜单资料、请向食堂核对，不反问用户是否想了解已经问清楚的菜品信息。
 reply只输出一个标记；emotion/gesture仍根据语义从capabilities选择或null：
 [[DINING_PREPARE|类别|菜品|感受|期望]]：类别只能是taste/dish_request/service/other。
 菜品、感受、期望分别从本轮用户原话中逐字摘取短片段；不适用时填-或留空，不得编造或补充用户未说过的原因。
@@ -28,6 +33,7 @@ reply只输出一个标记；emotion/gesture仍根据语义从capabilities选择
 补充或更正待提交的意见时，重新PREPARE；可以保留pending_dining中用户未否定的片段。用户说“不是青菜，是汤太咸”时应改为汤。
 若pending_dining.stage=await_item_clarification，说明菜名尚未核准；用户重新说出菜名后用PREPARE，可保留先前未撤回的“少放盐”等期望，不能直接CONFIRM。
 [[DINING_CONFIRM]]：仅当pending_dining正在等待确认，且本轮用户明确同意提交。
+“对，就这样记录”“好的，记下来吧”都是明确同意；若同时提出修改或否定，先修改/取消，不能直接确认旧内容。
 [[DINING_CANCEL]]：用户明确取消待提交意见。
 尚未确认时不能说已经登记；确认后程序负责写本地食堂反馈表并给出答复。不要承诺食堂已采纳、已改菜单或数据已发送到外部系统。
 其他任务仍返回原五字段JSON，不输出DINING标记。
@@ -110,6 +116,14 @@ def prepare_transition(reply, pending, utterance):
         observation = _grounded_observation(observation, utterance)
     if request:
         request = _grounded_request(request, utterance)
+    if parts[0] == "dish_request" and item and item in utterance and request and request not in utterance:
+        # The model already selected a dish wish and extracted an exact item.
+        # Keep the visitor's short original request instead of inventing e.g.
+        # "想吃清蒸鱼" when they actually said "以后能做清蒸鱼吗".
+        try:
+            request = _field(utterance)
+        except ValueError:
+            request = ""
     fields = [item, observation, request]
     if not any(fields):
         return None, "dining_empty_feedback"
@@ -150,8 +164,8 @@ def save_feedback(record, path=None):
     if path.exists():
         if path.stat().st_size > 2_000_000:
             raise ValueError("feedback register full")
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if json.loads(line).get("id") == record["id"]:
+        for saved in load_feedback(path):
+            if saved.get("id") == record["id"]:
                 return
     saved = {**record, "submitted_at": datetime.now(LOCAL_TIME).isoformat()}
     with path.open("a", encoding="utf-8", newline="\n") as out:
@@ -166,7 +180,10 @@ def load_feedback(path=None):
         return []
     if path.stat().st_size > 2_000_000:
         raise ValueError("feedback register full")
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if any(not isinstance(row, dict) for row in rows):
+        raise ValueError("invalid feedback record")
+    return rows
 
 
 def render_dashboard(records):

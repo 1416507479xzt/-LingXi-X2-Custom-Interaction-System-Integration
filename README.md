@@ -59,3 +59,5 @@ Windows 便携模拟器运行时，在仓库根目录安装 `requirements.txt`�
 `.gitignore` 排除了 `.env`、录音、历史反馈、缓存与生成的 ZIP。药品资料和提醒内容为项目配置，不能代替个人处方或真实预约记录。开源基础与改动说明见[开源引用说明](开源引用说明.md)及仓库提交历史。
 
 当前纯语音优化与十轮连续对话测试见[真机对话验收步骤](docs/zh-CN/voice-dialogue-acceptance.md)，包含日志和耗时记录方式；表情动作继续关闭。
+
+环节四真机语音确认、独立反馈记录及电脑SSH隧道查看网页，见[社区食堂意见收集测试步骤](docs/zh-CN/stage4-dining-feedback.md)。

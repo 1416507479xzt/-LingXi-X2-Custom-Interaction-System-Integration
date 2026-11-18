@@ -683,6 +683,11 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
             if result and result["intent"] == "dining":
                 dining, error = prepare_dining_transition(result["reply"], context.get("pending_dining"), utterance)
                 if error:
+                    if error == "dining_confirmation_without_pending" and not context.get("pending_dining"):
+                        # No draft exists: explain that state once, never write
+                        # or retry the model into inventing a draft to confirm.
+                        result["reply"] = "目前没有待确认的食堂意见，您可以先说想反馈的内容。"
+                        return result
                     diagnostic["reason"] = error
                     return None
                 result["reply"] = dining["reply"]
