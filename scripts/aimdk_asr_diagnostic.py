@@ -9,6 +9,7 @@ import array
 import asyncio
 import os
 from pathlib import Path
+from collections import deque
 import sys
 import time
 
@@ -31,6 +32,22 @@ def pcm_levels(pcm):
     return rms, peak
 
 
+async def recognize_with_capture(recognition, spin_once, ros_ok):
+    """Keep draining DDS while the cloud coroutine waits for network I/O."""
+    task = asyncio.create_task(recognition)
+    try:
+        while not task.done():
+            if not ros_ok():
+                raise RuntimeError("ROS 已停止")
+            spin_once()
+            await asyncio.sleep(0.005)
+        return await task
+    finally:
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--duration", type=float, default=60,
@@ -51,15 +68,20 @@ def main(argv=None):
     from x2_agent.asr import asr_transcribe
 
     collector = VadAssembler(stream_id=args.stream_id)
-    pending = []
+    pending = deque()
     rclpy.init()
     node = rclpy.create_node("eldercare_asr_diagnostic")
     qos = QoSProfile(depth=50, reliability=ReliabilityPolicy.BEST_EFFORT,
                      durability=DurabilityPolicy.VOLATILE)
 
     def on_audio(msg):
+        if msg.stream_id == args.stream_id and msg.audio_vad_state.value == 1:
+            print("VAD BEGIN：检测到新片段（不代表已正确识别说话内容）。", flush=True)
         segment = collector.feed(msg.stream_id, msg.audio_vad_state.value, msg.audio_data)
         if segment is not None and segment.pcm:
+            if len(pending) >= 4:
+                pending.popleft()
+                print("诊断积压超过4段，丢弃最旧片段；本轮需重新对照。", flush=True)
             pending.append(segment)
 
     node.create_subscription(ProcessedAudioOutput, "/agent/process_audio_output",
@@ -77,13 +99,17 @@ def main(argv=None):
             if not pending:
                 print("到时或 ROS 已停止；本次没有更多完整 VAD 片段。", flush=True)
                 break
-            segment = pending.pop(0)
+            segment = pending.popleft()
             rms, peak = pcm_levels(segment.pcm)
-            print("第 %d 段：%.2f 秒，%d 包，RMS=%d，峰值=%d" %
-                  (index, segment.audio_seconds, segment.packet_count, rms, peak),
+            print("第 %d 段：%.2f 秒PCM，VAD接收历时%.2f秒，%d 包，RMS=%d，峰值=%d" %
+                  (index, segment.audio_seconds, segment.elapsed_seconds,
+                   segment.packet_count, rms, peak),
                   flush=True)
+            print("正在识别，麦克风仍持续接收；请等下一次等待提示再说下一句。", flush=True)
             try:
-                result = asyncio.run(asr_transcribe(segment.pcm, speech_key, resource_id))
+                result = asyncio.run(recognize_with_capture(
+                    asr_transcribe(segment.pcm, speech_key, resource_id),
+                    lambda: rclpy.spin_once(node, timeout_sec=0), rclpy.ok))
                 print("第 %d 段 ASR：%s" % (index, result or "<空>"), flush=True)
             except Exception as exc:
                 print("第 %d 段 ASR 错误：%s: %s" %
