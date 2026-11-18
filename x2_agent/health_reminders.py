@@ -232,3 +232,17 @@ def reminder_reply_error(result, utterance=""):
     if re.search(r"(?:我会|我已|已经|已为您|帮您|给您).{0,15}(?:提醒.{0,8}(?:调整|改到|改为|设置)|(?:修改|设置|调整|登记|保存).{0,8}提醒)", result["reply"]):
         return "reminder_false_write_claim"
     return None
+
+
+def normalize_explicit_water_time(result, utterance):
+    """Normalize only a complete, explicit water-time query over query tokens.
+
+    No writes, completion claims, compound questions or medicine decisions.
+    The actual time still comes from the configured reminder context.
+    """
+    query_tokens = {"[[REMINDER_NEXT]]", "[[REMINDER_TODAY]]", "[[REMINDER_REMAINING]]",
+                    "[[REMINDER_MEDICATION]]", "[[REMINDER_APPOINTMENT]]"}
+    if (result.get("intent") == "reminder" and result.get("reply") in query_tokens
+            and re.fullmatch(r"(?:请问)?(?:我的)?喝水(?:提醒|安排|时间)?(?:是|在)?(?:几点|什么时候)(?:呀|呢|吗)?[？?。]*", utterance.strip())):
+        return {**result, "reply": "[[REMINDER_WATER]]"}
+    return result

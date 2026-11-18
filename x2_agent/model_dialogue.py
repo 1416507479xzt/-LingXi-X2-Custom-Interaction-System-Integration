@@ -16,7 +16,7 @@ from .presentation import EMOJI_IDS, MOTIONS
 from .care_reference import CARE_REFERENCE
 from .dialogue_quality import question_history, review_flags, suppress_repeated_question, suppress_repeated_advice, unconfirmed_injury_advice, unwanted_injury_followup, has_fatigue_practical_tip, REVIEW_PROMPT
 from .life_assistance import SERVICE_PROMPT
-from .health_reminders import expand_reminder_reply, reminder_reply_error, reminder_transition
+from .health_reminders import expand_reminder_reply, reminder_reply_error, reminder_transition, normalize_explicit_water_time
 from .medicine_consultation import dosage_context, medication_reply_error, medication_safe_fallback, expand_medicine_reply
 from .dining_feedback import DINING_PROMPT, prepare_transition as prepare_dining_transition, save_feedback
 
@@ -697,6 +697,10 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                 safety_clarification_needed = True
                 return None
             if result and result["intent"] != "dining" and "life_assistance" in payload_data:
+                normalized = normalize_explicit_water_time(result, utterance)
+                if normalized is not result:
+                    diagnostic["style_note"] = "reminder_water_time_normalized"
+                    result = normalized
                 error = reminder_reply_error(result, utterance)
                 if error == "reminder_remaining_misclassified":
                     result["reply"] = "[[REMINDER_REMAINING]]"

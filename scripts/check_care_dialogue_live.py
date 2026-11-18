@@ -91,6 +91,12 @@ async def main(scenario="care", presentation_backend="unity"):
         if scenario == "regression_stage1_latest":
             utterances = ("我今天感觉有点疲惫。", "有一点影响日常活动。", "我是因为腰酸和脖子难受睡不好。",
                           "一两天吧。", "没有，目前没有加重。")
+        if scenario == "stage2_voice":
+            print("Synthetic clock: 2026-11-18 09:45 Asia/Shanghai; no scheduler or robot writes")
+            utterances = ("降压药怎么吃，有什么注意事项？", "药名记不清了，你就说一般怎么吃。",
+                          "感冒药有什么注意事项？", "今天有什么提醒？", "下一项是几点？",
+                          "该吃药了吗？", "我已经吃过了。", "那我现在还要再吃一次吗？",
+                          "我什么时候复诊？", "喝水提醒是几点？")
         if scenario == "voice_competition":
             utterances = ("我今天感觉有点疲惫。", "有一点影响。", "我今天脖子疼，腰酸。",
                           "有什么缓解的办法吗？", "你还记得我现在哪里住吗？", "你不记得我哪里不舒服了吗？")
@@ -102,6 +108,7 @@ async def main(scenario="care", presentation_backend="unity"):
             started = time.perf_counter()
             answer = await generate_dialogue(llm, utterance, {
                 **memory.context(), "turn_kind": "dialogue", "capabilities": capabilities(backend=presentation_backend),
+                **({"life_assistance": load_context(now=datetime(2026, 11, 18, 9, 45, tzinfo=LOCAL_TIME))} if scenario == "stage2_voice" else {}),
                 **({"life_assistance": load_context()} if scenario in {"services", "medicines", "healthy_transition", "voice_competition"} else {}),
                 **({"life_assistance": load_context(now=datetime(2026, 10, 23, 9, 45, tzinfo=LOCAL_TIME))} if scenario == "reminders" else {}),
                 **({"life_assistance": load_context(now=datetime(2026, 10, 24, 11, 1, tzinfo=LOCAL_TIME))} if scenario in {"regression_oct24", "regression_latest", "regression_stage1_latest"} else {}),
@@ -119,7 +126,7 @@ async def main(scenario="care", presentation_backend="unity"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Allow paid model calls (care: up to 18; conversation: up to 22; presentation/proactive: up to 10; services: up to 14)")
-    parser.add_argument("--scenario", choices=("care", "conversation", "presentation", "proactive", "services", "medicines", "healthy_transition", "reminders", "reminder_natural", "regression_oct23", "regression_oct24", "regression_latest", "regression_stage1_latest", "safe_relief", "quality_repeat", "quality_severity", "voice_interruption", "voice_competition"), default="care")
+    parser.add_argument("--scenario", choices=("care", "conversation", "presentation", "proactive", "services", "medicines", "healthy_transition", "reminders", "reminder_natural", "regression_oct23", "regression_oct24", "regression_latest", "regression_stage1_latest", "safe_relief", "quality_repeat", "quality_severity", "voice_interruption", "voice_competition", "stage2_voice"), default="care")
     parser.add_argument("--presentation-backend", choices=("unity", "none"), default="unity", help="Use none to match the current voice-only robot")
     args = parser.parse_args()
     if not args.live:

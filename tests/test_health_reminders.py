@@ -20,6 +20,26 @@ class ReminderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(calls), 1)
         self.assertIn("今天接下来没有其他", result["reply"])
 
+    async def test_explicit_water_time_uses_configured_time_without_retry(self):
+        calls = []
+        async def stream(*args, **kwargs):
+            calls.append(1)
+            yield "text", json.dumps(dict(intent="reminder", action="continue", reply="[[REMINDER_APPOINTMENT]]", emotion=None, gesture=None))
+        answer = await generate_dialogue(SimpleNamespace(stream=stream), "喝水提醒是几点？",
+            {**ModelDialogue().context(), "capabilities": capabilities(backend="none"), "life_assistance": self.context(9, 45)}, "m", "k")
+        self.assertEqual(len(calls), 1)
+        self.assertIn("10点整", answer["reply"])
+        self.assertIn("喝水", answer["reply"])
+        self.assertNotIn("复诊", answer["reply"])
+
+    def test_water_time_normalization_leaves_changes_and_compound_queries_alone(self):
+        from x2_agent.health_reminders import normalize_explicit_water_time
+        result = dict(intent="reminder", reply="[[REMINDER_APPOINTMENT]]")
+        for text in ("把喝水提醒改到几点？", "复诊和喝水提醒是几点？", "我已经喝水了", "不要喝水提醒", "该吃药了吗？"):
+            self.assertEqual(normalize_explicit_water_time(result, text), result)
+        done = dict(intent="reminder", reply="[[REMINDER_WATER_DONE]]")
+        self.assertEqual(normalize_explicit_water_time(done, "喝水提醒是几点？"), done)
+
     def setUp(self):
         self.data = {"version": 1, "demo": True, "medicines": [], "reminders": [
             {"id": "water", "date": "daily", "time": "10:00", "kind": "water", "title": "喝水提醒"},
