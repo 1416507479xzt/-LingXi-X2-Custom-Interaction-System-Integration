@@ -38,8 +38,7 @@ python agent.py --competition-mode --health-semantic model --presentation-backen
 
 Unity目前只有六种视觉表情、两种动作；sympathy与admiration都近似显示爱心，
 不是不同的动画。不能把SDK的200“崇拜”误作同情。
-AimDK目录扩展为20种表情和20种预设动作，包括思考、严肃、鼓掌、比心、
-加油、鞠躬等；完整编号与语义在`x2_agent/presentation.py`。
+源码保留20种表情和历史预设动作映射供参考；主分支运行时不开放未经机载核对的全部动作。默认仅表情，显式动作开关也仅开放已核对的左右挥手/举手，见`x2_agent/presentation.py`。
 没有开放伪造故障/充电状态、握手等接触动作或行走控制。
 目录按后端传给模型，并包含语义说明；不向Unity宣称它具有全部真机动画。
 本次Python修改不会为便携版模拟器增加动画，需要新增动画时必须修改Unity工程并重新构建。
@@ -54,8 +53,7 @@ AimDK目录扩展为20种表情和20种预设动作，包括思考、严肃、�
 代码提供可选 `--presentation-backend aimdk`，仅处理表情与预设动作。它依赖PC2上的
 ROS2/rclpy和匹配固件的aimdk_msgs，Windows仿真不导入这些依赖。
 启用还需要显式传入`--enable-robot-presentation`，并使用竞赛model模式。
-**这不是完整真机启动指南：ASR输入和TTS输出仍走现有WebSocket网关，独立ROS音频桥尚未实现。**
-没有经过验证的音频网关/桥接时，不能仅切换这个参数就宣称可以独立上真机。
+真机音频现已通过 --transport aimdk 接入，操作以[复现指南](reproduce-on-x2.md)为准。2026-11-19起，--enable-robot-presentation默认只开放表情；肢体动作另需--enable-robot-motion。机载字段核对后只开放左右挥手/举手，零力矩时不执行；本轮对话联动与动作仍待实测，见[接入记录](2026-11-19-presentation-integration.md)。
 
 接口：
 - `/aimdk_5Fmsgs/srv/PlayEmoji`：mode=1单次，priority=1，不覆盖系统故障高优先级提示；
@@ -203,4 +201,4 @@ capabilities增加`explanation_gestures`与`explanation_note`，由模型根据�
 - [预设动作与安全约束](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/preset_motion.html)
 - [运动模式查询](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/modeswitch.html)
 
-没有连接或操作真实机器人；没有切换PC3交互模式、关闭系统服务或修改PC1。
+本页早期设计阶段未操作机器人；截至2026-11-19已有用户执行快乐表情单项成功的证据，不能将本页旧设计说明当作动作实机验收。

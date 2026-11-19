@@ -188,7 +188,9 @@ def acknowledge_wake_greeting(text):
 class DoubaoAgent:
     def __init__(self, args):
         self.args = args
-        self.presentation_backend = (AimdkPresentation()
+        self._presentation_tasks = set()
+        self.presentation_backend = (AimdkPresentation(
+            enable_motion=getattr(args, "enable_robot_motion", False))
             if getattr(args, "presentation_backend", "unity") == "aimdk" else None)
         self._last_model_gesture = float("-inf")
         self._failed_gestures_until = {}
@@ -234,6 +236,10 @@ class DoubaoAgent:
         self._tts_warm = asyncio.create_task(prepare())
 
     async def close(self):
+        for task in self._presentation_tasks:
+            task.cancel()
+        if self._presentation_tasks:
+            await asyncio.gather(*self._presentation_tasks, return_exceptions=True)
         if self._llm_warm is not None:
             if not self._llm_warm.done():
                 self._llm_warm.cancel()
@@ -292,7 +298,9 @@ class DoubaoAgent:
     def _model_context(self, *, greeting=False):
         context = self.health_flow.model_dialogue.context()
         backend = getattr(self.args, "presentation_backend", "unity")
-        context["capabilities"] = capabilities(self.control_active, backend)
+        context["capabilities"] = capabilities(
+            self.control_active, backend,
+            enable_motion=getattr(self.args, "enable_robot_motion", False))
         if greeting and backend == "unity":
             # The simulator has reported both greeting gestures as failed.
             # Stage 1 only requires speech + expression at the greeting;
@@ -320,6 +328,20 @@ class DoubaoAgent:
         return context
 
     async def _model_presentation(self, ws, event_id, item_id, presentation):
+        if self.presentation_backend is not None:
+            # Do not make the first speech PCM wait for a ROS service reply.
+            # Keep at most one in-flight plan; never queue stale movements.
+            if self._presentation_tasks:
+                logger.info("agent     表现请求仍在处理，跳过新表现；继续语音")
+                return
+            task = asyncio.create_task(self._dispatch_model_presentation(
+                ws, event_id, item_id, presentation))
+            self._presentation_tasks.add(task)
+            task.add_done_callback(self._presentation_tasks.discard)
+            return
+        await self._dispatch_model_presentation(ws, event_id, item_id, presentation)
+
+    async def _dispatch_model_presentation(self, ws, event_id, item_id, presentation):
         """Only validated model selections reach here, at the first speech PCM."""
         results = []
         try:
@@ -1020,7 +1042,9 @@ def parse_args(argv=None):
     p.add_argument("--presentation-backend", choices=["unity", "aimdk", "none"], default="unity",
                    help="切换表情动作后端；aimdk需要PC2 ROS2环境")
     p.add_argument("--enable-robot-presentation", action="store_true",
-                   help="现场安全确认后允许AimDK表情动作调用；不会自动切换机器人运动模式")
+                   help="允许AimDK屏幕表情；肢体动作仍需单独开启，不自动切换运动模式")
+    p.add_argument("--enable-robot-motion", action="store_true",
+                   help="额外允许已核对的预设肢体动作；执行前仍检查稳定站立，零力矩时不执行")
     p.add_argument("--transport", choices=["unity", "aimdk"], default="unity",
                    help="音频输入输出：默认Unity网关；aimdk使用PC2 ROS话题")
     p.add_argument("--enable-robot-audio", action="store_true",

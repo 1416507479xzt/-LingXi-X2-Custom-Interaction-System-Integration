@@ -30,6 +30,9 @@ EMOTION_MEANINGS = dict(zip(EMOJI_IDS, [
     "悲伤，仅在语境确实合适时，不能把身体疲劳等同悲伤", "同情和关怀，不应每轮重复",
     "疑惑", "震惊，不夸大健康风险", "撒娇，谨慎使用", "严肃", "思考",
     "愤怒，不对长者发怒", "崇拜和赞赏，不等于同情"]))
+# Only these motion/area pairs have been checked against the supplied v1.0.0 types.
+VERIFIED_MOTIONS = {name: MOTIONS[name] for name in
+                    ("wave_hands", "wave_left", "raise_right", "raise_left")}
 GESTURE_MEANINGS = dict(zip(MOTIONS, [
     "右手挥手，问候或告别", "左手挥手", "右手举手", "左手举手",
     "鼓掌，祝贺或鼓励", "右手敬礼", "左手敬礼", "双手比心，表达关怀",
@@ -48,19 +51,21 @@ SERVICES = {
 }
 
 
-def capabilities(control=True, backend="unity"):
+def capabilities(control=True, backend="unity", *, enable_motion=False):
     if backend == "none":
         return {"emotions": [], "gestures": [], "explanation_gestures": [],
                 "explanation_note": "当前只测试语音链路，不执行表情和动作。",
                 "emotion_meanings": {}, "gesture_meanings": {},
                 "backend": "none", "visual_limit": ""}
     emotions = list(EMOJI_IDS if backend == "aimdk" else UNITY_EMOTIONS) if control else []
-    gestures = list(MOTIONS if backend == "aimdk" else
+    gestures = list((VERIFIED_MOTIONS if enable_motion else {}) if backend == "aimdk" else
                     [name for name in MOTIONS if name in UNITY_GESTURES]) if control else []
     explanation_candidates = (["raise_right", "raise_left"] if backend == "aimdk" else ["open_arms"])
     return {"emotions": emotions, "gestures": gestures,
             "explanation_gestures": [name for name in explanation_candidates if name in gestures],
             "explanation_note": (
+                "肢体动作未开启；只可选择屏幕表情，gesture必须为null。"
+                if backend == "aimdk" and not enable_motion else
                 "可用举手作一次讲解强调，不是指点、摊掌或治疗示范；不保证小幅度动作，需保持安全距离。"
                 if backend == "aimdk" else
                 "open_arms是已有的双臂展开动画，可近似配合一次友善说明，不是专门的摊掌讲解动画。"
@@ -91,19 +96,24 @@ class AimdkPresentation:
     before motion, never switch robot mode. No retries of uncertain writes:
     timeout is NOT evidence that an action failed to execute.
     """
-    def __init__(self):
+    def __init__(self, *, enable_motion=False):
+        self.enable_motion = enable_motion
         try:
             import rclpy
             from rclpy.context import Context
             from rclpy.node import Node
-            from aimdk_msgs.srv import PlayEmoji, SetMcPresetMotion, GetMcAction
+            from aimdk_msgs.srv import PlayEmoji
+            if enable_motion:
+                from aimdk_msgs.srv import SetMcPresetMotion, GetMcAction
         except ImportError as exc:
             raise ValueError("AimDK表现后端需要PC2上的rclpy及匹配固件的aimdk_msgs") from exc
         self.ros = rclpy
         self.context = Context()
         rclpy.init(context=self.context)
         self.node = Node("eldercare_presentation", context=self.context)
-        self.types = {"emoji": PlayEmoji, "motion": SetMcPresetMotion, "mode": GetMcAction}
+        self.types = {"emoji": PlayEmoji}
+        if enable_motion:
+            self.types.update(motion=SetMcPresetMotion, mode=GetMcAction)
         self.clients = {k: self.node.create_client(v, SERVICES[k]) for k, v in self.types.items()}
         self.lock = asyncio.Lock()
         self.last_motion = float("-inf")
@@ -139,6 +149,10 @@ class AimdkPresentation:
                                 "status": "unknown" if response is None else
                                 ("accepted" if response.success else "rejected")})
             if gesture:
+                if not self.enable_motion or gesture not in VERIFIED_MOTIONS:
+                    results.append({"kind": "gesture", "name": gesture,
+                                    "status": "blocked", "reason": "motion_not_enabled_or_verified"})
+                    return results
                 status = "blocked"
                 if allowed() and time.monotonic() - self.last_motion >= 8:
                     state = await self._call("mode", self.types["mode"].Request())
@@ -146,7 +160,7 @@ class AimdkPresentation:
                             and state.info.action_desc == "STAND_DEFAULT"
                             and state.info.status.value == 100 and allowed()):
                         req = self.types["motion"].Request()
-                        req.motion.value, req.area.value = MOTIONS[gesture]
+                        req.motion.value, req.area.value = VERIFIED_MOTIONS[gesture]
                         req.interrupt = False
                         # Default zero stamp means immediate; do not set future timestamps.
                         self.last_motion = time.monotonic()
@@ -158,4 +172,5 @@ class AimdkPresentation:
 
     def close(self):
         self.node.destroy_node()
-        self.ros.shutdown(context=self.context)
+        if self.context.ok():
+            self.ros.shutdown(context=self.context)

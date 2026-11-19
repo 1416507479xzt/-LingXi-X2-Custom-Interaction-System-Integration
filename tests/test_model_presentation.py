@@ -59,14 +59,16 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
     def test_backend_catalogs_and_meanings(self):
         from x2_agent.presentation import EMOJI_IDS, MOTIONS
         unity = capabilities()
-        aimdk = capabilities(backend="aimdk")
+        aimdk = capabilities(backend="aimdk", enable_motion=True)
         self.assertEqual(len(EMOJI_IDS), 20)
         self.assertEqual(len(MOTIONS), 20)
         for catalog in (unity, aimdk):
             self.assertEqual(set(catalog["emotions"]), set(catalog["emotion_meanings"]))
             self.assertEqual(set(catalog["gestures"]), set(catalog["gesture_meanings"]))
         self.assertNotIn("clap", unity["gestures"])
-        self.assertIn("clap", aimdk["gestures"])
+        self.assertNotIn("clap", aimdk["gestures"])
+        self.assertEqual(set(aimdk["gestures"]),
+                         {"wave_hands", "wave_left", "raise_right", "raise_left"})
         self.assertEqual(MOTIONS["clap"], (3017, 11))
         self.assertEqual(MOTIONS["heart_both"], (1007, 3))
         self.assertEqual(EMOJI_IDS["neutral"], 10)
@@ -80,8 +82,9 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
         for emotion in ("neutral", "happy", "sad", "surprised", "admiration"):
             self.assertIsNotNone(self.validate(emotion=emotion, gesture="open_arms"))
         self.assertIsNone(self.validate(gesture="clap"))
-        self.ctx["capabilities"] = capabilities(backend="aimdk")
-        self.assertIsNotNone(self.validate(emotion="thinking", gesture="heart_both"))
+        self.ctx["capabilities"] = capabilities(backend="aimdk", enable_motion=True)
+        self.assertIsNotNone(self.validate(emotion="thinking", gesture="raise_right"))
+        self.assertIsNone(self.validate(emotion="thinking", gesture="heart_both"))
         self.assertEqual(unity_plan("neutral", "open_arms", "您好"),
                          [("emotion", "neutral", {}), ("gesture", "open_arms", {})])
         with self.assertRaises(ValueError):
@@ -174,7 +177,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.calls, [])
         await self.turn("林夕林夕")
         self.assertTrue(self.agent._competition_greeted)
-        self.assertEqual(self.spoken(), self.plan["reply"])
+        self.assertEqual(self.spoken(), "您好，我在呢。今天感觉怎么样？")
         self.assertEqual(self.agent.health_flow.model_dialogue.health_rounds, 0)
         self.assertIn("今天感觉", self.agent.health_flow.model_dialogue.verbatim_turns[-1]["assistant"])
         self.assertFalse(any(f["type"] == T["skill"] and f.get("skillType") == "gesture"
@@ -185,7 +188,7 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         with patch("x2_agent.agent.generate_dialogue", new=AsyncMock(return_value=None)) as generate:
             await self.turn("林夕林夕")
         self.assertEqual(generate.call_args.kwargs["timeout"], 3.0)
-        self.assertEqual(self.spoken(), "您好，我是灵犀。见到您真好！您今天感觉怎么样？")
+        self.assertEqual(self.spoken(), "您好，我在呢。我是灵犀。见到您真好！您今天感觉怎么样？")
         self.assertTrue(self.agent._competition_greeted)
         self.assertTrue(self.agent.health_flow.awaiting_health)
         self.assertIn("今天感觉", self.agent.health_flow.model_dialogue.verbatim_turns[-1]["assistant"])
@@ -199,6 +202,8 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(unity["gesture_meanings"], {})
         self.assertEqual(unity["explanation_gestures"], [])
         self.agent.args.presentation_backend = "aimdk"
+        self.assertEqual(self.agent._model_context(greeting=True)["capabilities"]["gestures"], [])
+        self.agent.args.enable_robot_motion = True
         aimdk = self.agent._model_context(greeting=True)["capabilities"]
         self.assertIn("wave_hands", aimdk["gestures"])
 
@@ -264,6 +269,7 @@ class AimdkTests(unittest.IsolatedAsyncioTestCase):
     def make_backend(self, mode="STAND_DEFAULT", status=100, accepted=True):
         b = object.__new__(AimdkPresentation)
         b.lock = asyncio.Lock()
+        b.enable_motion = True
         b.last_motion = float("-inf")
         b.types = {k: NS(Request=lambda: NS(motion=NS(value=0), area=NS(value=0)))
                    for k in ("emoji", "motion", "mode")}

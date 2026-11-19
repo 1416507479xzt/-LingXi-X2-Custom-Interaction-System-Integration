@@ -63,6 +63,7 @@ class AgentConfig:
     health_semantic: str = "model"  # model-first; auto/rules retain the legacy flow
     presentation_backend: str = "unity"
     enable_robot_presentation: bool = False
+    enable_robot_motion: bool = False
     transport: str = "unity"
     enable_robot_audio: bool = False
     mic_stream_id: object = "auto"
@@ -113,6 +114,9 @@ class AgentConfig:
                 not self.enable_robot_presentation or not self.competition_mode
                 or self.health_semantic != "model"):
             raise ValueError("AimDK表现后端仅支持竞赛model模式，需显式开启 --enable-robot-presentation")
+        if self.enable_robot_motion and (self.presentation_backend != "aimdk"
+                                         or not self.enable_robot_presentation):
+            raise ValueError("真机肢体动作需AimDK表现后端及 --enable-robot-presentation")
         if type(self.history_turns) is not int or self.history_turns < 0:
             raise ValueError("history_turns 不能为负数")
         if self.log_level not in ("DEBUG", "INFO", "WARNING", "ERROR"):
