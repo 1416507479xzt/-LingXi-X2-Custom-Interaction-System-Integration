@@ -207,8 +207,11 @@ class PipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("wave_hands", aimdk["gestures"])
 
     def test_recent_or_failed_gesture_is_not_offered_to_model(self):
-        self.agent._last_model_gesture = time.monotonic() - 20
+        self.agent._last_model_gesture = time.monotonic() - 4
         self.assertEqual(self.agent._model_context()["capabilities"]["gestures"], [])
+        self.assertEqual(self.agent._model_context()["capabilities"]["gesture_availability"]["reason"], "cooldown")
+        self.agent._last_model_gesture = time.monotonic() - 20
+        self.assertIn("open_arms", self.agent._model_context()["capabilities"]["gestures"])
         self.agent._last_model_gesture = float("-inf")
         self.agent._failed_gestures_until["open_arms"] = time.monotonic() + 40
         available = self.agent._model_context()["capabilities"]

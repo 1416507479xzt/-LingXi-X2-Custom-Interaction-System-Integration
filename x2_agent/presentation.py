@@ -53,6 +53,8 @@ UNITY_EMOTIONS = {"neutral": "neutral", "happy": "happy", "sad": "sad",
                   "sympathy": "love", "surprised": "surprised",
                   "angry": "angry", "admiration": "love"}
 UNITY_GESTURES = {"wave_hands", "open_arms"}
+MOTION_COOLDOWN_SECONDS = 8.0
+
 SERVICES = {
     "emoji": "/aimdk_5Fmsgs/srv/PlayEmoji",
     "motion": "/aimdk_5Fmsgs/srv/SetMcPresetMotion",
@@ -242,7 +244,7 @@ class AimdkPresentation:
                                     "status": "blocked", "reason": "motion_not_enabled"})
                     return results
                 status = "blocked"
-                if allowed() and time.monotonic() - self.last_motion >= 8:
+                if allowed() and time.monotonic() - self.last_motion >= MOTION_COOLDOWN_SECONDS:
                     mode_request = self.types["mode"].Request()
                     mode_request.request.header.stamp = self.node.get_clock().now().to_msg()
                     state = await self._call("mode", mode_request)

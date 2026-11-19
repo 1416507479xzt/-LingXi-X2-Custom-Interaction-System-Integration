@@ -103,8 +103,8 @@ def ensure_interview_closing(result, context):
 def brief_positive_status(text):
     """Narrow flow guard for a direct answer to the opening status question."""
     clean = re.sub(r"[\s，,。！？!?啊呀吧呢]", "", text or "")
-    return (len(clean) <= 24 and bool(re.search(r"还可以|还行|还好|挺好|不错|蛮好|一般", clean))
-            and not re.search(r"药|提醒|怎么|什么|能否|是否|不太|不好", clean))
+    return (len(clean) <= 24 and bool(re.search(r"还可以|还行|还好|挺好|很好|不错|蛮好|一般", clean))
+            and not re.search(r"药|提醒|怎么|什么|能否|是否|不太|不好|疼|痛|酸|疲惫|累|不舒服|难受|失眠|头晕|但是|不过|就是", clean))
 
 
 def soften_fatigue_question(result, utterance, context=None):
@@ -168,6 +168,7 @@ def ensure_opening_followup(result, utterance, context):
             or _URGENT_REPLY_PATTERN.search(result["reply"])):
         return result
     question = ("这种不适影响您今天活动吗？" if re.search(r"疼|痛|酸|累|疲惫|不舒服", utterance)
+                else "您最近休息和胃口怎么样？" if brief_positive_status(utterance)
                 else "您今天还有哪里不舒服吗？")
     if len(result["reply"]) + len(question) > MAX_REPLY:
         return result
@@ -200,6 +201,9 @@ reply最多180字，通常1到2句，尽量在70字内；必要安全说明可�
 别人说身体不舒服时，不以“很抱歉您不舒服”“很遗憾听到”等客服式歉语开头；用自然承接和一个有用的问题或提示。
 
 连续对话：
+用户说状态不错、挺好、还好且没有不适时，先正向承接；不能问“这种好状态是否影响日常活动”，不能把正常状态当症状。可自然关心最近休息、胃口，不预设有病或生活受限。
+用户质疑“你在说什么”“怎么可能影响”时，先检查自己上一句是否逻辑不当，简短纠正，不擅自说用户没听清，也不原样重复错误问题。
+用户不满或批评时不说自己委屈，不要求用户好好说话，不撒娇顶嘴；承认刚才回答不合适，回到对方实际需求。
 先看当前原话，再看pending_question及最近对话。短答应承接最近语义匹配的问题，而非机械绑定最后一个问号；中间若有无关插话或听不清的澄清，“有一点影响”仍可回答之前的疲惫是否影响做事，不必重复追问影响指什么。不能把无关话语当成健康事实。
 用户纠正覆盖旧说法；新增部位不能覆盖其他仍有效的不适；回顾使用用户原话，不添加推测。明确问“记不记得我哪里不舒服”时，必须先读verbatim_turns中的用户原话，按最新纠正回答；不能因为自己上一句说记不清，就继续声称遗忘或要求重说。用户没提供过住址时，应说明还没告诉过住址，不能声称曾知道但忘了，也不能擅自把住址问题改成健康问题。
 “一两天”等短答只关联最近问题或最近新增的不适，不把时长自动扩展到较早提到的疲惫等别的症状。
@@ -235,7 +239,9 @@ response_status=unanswered只表示机器人没答好，不表示用户撤回事
 回答内容、emotion、gesture由你结合本轮原话和对话上下文统一决定，不等待程序按关键词拼动作。
 emotion、gesture从capabilities枚举中选择或null；每轮最多一个动作。不要照抄上一轮，不为展示动作而逐个轮换。
 用户明确要求某个已开放动作时，正确区分左右手、举手/挥手/握手/击掌/鼓掌等不同动作；用户拒绝动作时gesture必须为null。
-没有明确动作请求时，也可按语义自然选择招呼、鼓励、告别或讲解手势；简单确认可只说话，不强制表情或动作。
+没有明确动作请求时，应主动考虑为实质性回答配合一个合适动作：问候/告别可挥手，积极近况可鼓掌或加油，关怀可比心，生活与用药说明可举手配合讲解。由你按当前内容选择，可适度变化，不把null当作所有普通对话的默认值，也不要把举手说成治疗动作。
+简单确认、只问一句澄清、急迫求助、用户拒绝时可只说话；不为了频繁而每轮必做，不机械重复挥手。
+能力目录为空或gesture_availability提示冷却时，gesture必须为null，回答不能说“这就比心/马上挥手”承诺执行不可用动作；可自然解释稍等或先用语言回应。
 partner_gestures需要对方配合：仅在用户明确提出或已确认愿意交互时选择；不能宣称已经接触、抓住或抱住对方。
 夸张、滑稽、飞吻等表演动作仅在用户明确要求或已建立的表演情境使用，不用于不适、用药或急迫求助。
 motion_validation只是实测记录，不能把目录中的动作说成已执行或已通过实机验收。
@@ -521,7 +527,7 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
         prompt = GREETING_PROMPT if greeting else SYSTEM_PROMPT
         if not greeting:
             if context.get("interview_active") and context.get("health_rounds", 0) == 0:
-                prompt += "\n当前是开场第一轮。用户回答今日状态（包括‘还可以’）时必须health/followup，先承接状态再问一个健康相关问题，不用acknowledge。"
+                prompt += "\n当前是开场第一轮。用户回答今日状态（包括‘还可以’）时必须health/followup，先承接状态再问一个健康相关问题，不用acknowledge。状态良好时自然关心休息或胃口，不问好状态是否影响生活，也不先假定哪里不舒服。"
                 prompt += ("生活建议直接说做法，最多一项；依据care_reference选择，"
                            "如疲惫可把泛泛的‘规律作息’讲具体为睡前安排阅读或轻松音乐等放松活动，"
                            "不推定病因，不保证效果。不重复‘您说疲惫/了解疲惫感/我记下了’等确认。"
@@ -564,6 +570,12 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                         "。重新生成完整五字段JSON。开场问询以外的主动求助使用other/continue，"
                         "可有一个必要的澄清问题；close不能有问句。") +
                        "不要向用户提及校验，不要复制错误，也不要增加动作。")
+            if repair_reason == "positive_status_impairment_question":
+                prompt += "用户只说今天状态好，没有报告不适。不要再问好状态是否影响日常活动；正向承接后自然关心休息或胃口即可。"
+            if repair_reason == "unsupported_hearing_assumption":
+                prompt += "用户是在质疑回答，不是说自己没听清。承认自己表达不妥，简短纠正，不推断听力或理解能力，不重复上一句问题。"
+            if repair_reason == "unavailable_gesture_promise":
+                prompt += "上次口头承诺的动作实际不可用。gesture保持null，重新生成不承诺立即动作的自然回答；若冷却可说明稍等，不要改选另一个动作绕过限制。"
             if repair_reason == "acknowledgement_not_brief":
                 if (context.get("interview_active") and context.get("health_rounds", 0) == 0
                         and brief_positive_status(utterance)):
@@ -652,6 +664,12 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
         if not greeting:
             # Keep the actual current request last, not buried before reference
             # data and older dialogue. Do not replay old assistant speech as new input.
+            if "life_assistance" in payload_data:
+                prompt += ("\n话题切换示例（必须结合当前原话判断）：上一轮问降压药怎么吃，"
+                           "本轮问‘今天有什么注意事项’，本项目指今天的日常安排和提醒，"
+                           "输出reminder/continue及[[REMINDER_TODAY]]，不要继续输出药物说明。"
+                           "若明确问‘这个药有什么注意事项’则仍回答用药注意事项。"
+                           "医学资料只是参考，不能把之前的用药话题强加给新的日程问题。")
             messages.append({"role": "user", "content": "本轮用户原话（只回应这一轮，结合前述背景）：" + utterance})
         stream = llm.stream(prompt, messages,
                             model, api_key, tools=None)
@@ -676,6 +694,18 @@ async def generate_dialogue(llm, utterance, context, model, api_key, *, timeout=
                 return validate_greeting("".join(chunks), context, diagnostics=diagnostic)
             result = validate_reply("".join(chunks), context, diagnostics=diagnostic,
                                     degrade_presentation=True)
+            if result and re.search(r"您.{0,8}(?:没听清|没听懂|没理解)", result["reply"]) and not re.search(
+                    r"没听清|没听懂|没听见|再说一遍|听不清", utterance):
+                diagnostic["reason"] = "unsupported_hearing_assumption"
+                return None
+            if result and brief_positive_status(utterance) and result["intent"] == "health" and re.search(
+                    r"影响.{0,12}(?:日常|生活|活动|安排|做事)", result["reply"]):
+                diagnostic["reason"] = "positive_status_impairment_question"
+                return None
+            if result and "gesture" in diagnostic.get("dropped", []) and re.search(
+                    r"(?:这就|马上|现在就|我来|我会|我可以|已经)(?:为您|给您|帮您|向您)?(?:挥.{0,3}手|比.{0,2}心|鼓掌|举.{0,3}手|敬礼|鞠躬|伸.{0,3}手)", result["reply"]):
+                diagnostic["reason"] = "unavailable_gesture_promise"
+                return None
             if result and missed_health_recall(result["reply"], utterance, context.get("verbatim_turns", [])):
                 diagnostic["reason"] = "health_recall_without_history_use"
                 return None

@@ -33,10 +33,10 @@ from .competition_flow import HealthGreetingFlow
 from .health_semantics import interpret_health
 from .model_dialogue import generate_dialogue, DialogueReply, FALLBACK_REPLY
 from .life_assistance import load_context as load_life_assistance
-from .presentation import AimdkPresentation, MOTIONS, capabilities, unity_plan
+from .presentation import AimdkPresentation, MOTIONS, MOTION_COOLDOWN_SECONDS, capabilities, unity_plan
 
 logger = logging.getLogger(__name__)
-MODEL_GESTURE_COOLDOWN = 45.0
+MODEL_GESTURE_COOLDOWN = MOTION_COOLDOWN_SECONDS
 
 # 断句和音频参数常量
 SENTENCE_MIN_WEAK_CHARS = 8  # 弱标点需要凑够的最少字符数
@@ -315,6 +315,9 @@ class DoubaoAgent:
             context["life_assistance"] = load_life_assistance(getattr(self.args, "service_data", None))
         now = time.monotonic()
         if now - self._last_model_gesture < MODEL_GESTURE_COOLDOWN:
+            context["capabilities"]["gesture_availability"] = {
+                "reason": "cooldown", "retry_after_seconds": round(
+                    MODEL_GESTURE_COOLDOWN - (now - self._last_model_gesture), 1)}
             context["capabilities"]["gestures"] = []
             context["capabilities"]["gesture_meanings"] = {}
             context["capabilities"]["explanation_gestures"] = []
@@ -362,7 +365,9 @@ class DoubaoAgent:
                     presentation.emotion, presentation.gesture, lambda: self.control_active)
                 if any(r.get("kind") == "gesture" and r.get("status") in {"accepted", "unknown"}
                        for r in results):
-                    self._last_model_gesture = time.monotonic()
+                    sent_at = getattr(self.presentation_backend, "last_motion", None)
+                    self._last_model_gesture = (sent_at if isinstance(sent_at, (int, float))
+                        and float("-inf") < sent_at <= time.monotonic() else time.monotonic())
                 for r in results:
                     if r.get("kind") == "gesture" and r.get("status") == "rejected":
                         self._failed_gestures_until[r["name"]] = time.monotonic() + MODEL_GESTURE_COOLDOWN

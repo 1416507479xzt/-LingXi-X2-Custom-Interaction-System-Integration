@@ -1,0 +1,156 @@
+{
+  "scope": "Synthetic regression of observed dialogue issues; no ROS, TTS or robot calls.",
+  "model": "doubao-seed-2-0-mini-260428",
+  "cases": [
+    {
+      "scenario": "healthy_and_correction",
+      "user": "今天感觉不错",
+      "answer": {
+        "intent": "health",
+        "action": "followup",
+        "reply": "今天休息得怎么样，胃口还好吗？",
+        "emotion": "happy",
+        "gesture": "clap",
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1177
+    },
+    {
+      "scenario": "healthy_and_correction",
+      "user": "你在说什么东西啊？",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "刚才是想问您今天休息得怎么样，胃口还好吗，您有什么想聊的都可以和我说。",
+        "emotion": "confused",
+        "gesture": null,
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1051
+    },
+    {
+      "scenario": "healthy_and_correction",
+      "user": "你真是个呆子。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "抱歉刚才的回答让您不满意，您有什么想聊的都可以和我说。",
+        "emotion": "neutral",
+        "gesture": null,
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1085
+    },
+    {
+      "scenario": "medicine_to_daily_schedule",
+      "user": "降压药该怎么吃",
+      "answer": {
+        "intent": "other",
+        "action": "continue",
+        "reply": "按照本人处方规定的时间、频次和剂量规律服用，不同降压药的服用量不相同。不要因为一次血压正常就自行停药或加减量，个人剂量以处方或药师核对结果为准。服用前请对照本人处方或药盒说明，确认服用时间和每次用量。",
+        "emotion": "neutral",
+        "gesture": "raise_right",
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1806
+    },
+    {
+      "scenario": "medicine_to_daily_schedule",
+      "user": "今天有什么注意事项",
+      "answer": {
+        "intent": "reminder",
+        "action": "continue",
+        "reply": "您今天有这些提醒：8点整核对用药安排，9点30分复诊，10点整喝水，15点整确认社区活动安排。有些时间已经过了，您是否做过还需要确认。下一项预设提醒是明天8点整核对用药安排。用药仍请按医嘱核对。",
+        "emotion": "neutral",
+        "gesture": null,
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 816
+    },
+    {
+      "scenario": "medicine_to_daily_schedule",
+      "user": "我问的是今天的日常安排和提醒",
+      "answer": {
+        "intent": "reminder",
+        "action": "continue",
+        "reply": "您今天有这些提醒：8点整核对用药安排，9点30分复诊，10点整喝水，15点整确认社区活动安排。有些时间已经过了，您是否做过还需要确认。下一项预设提醒是明天8点整核对用药安排。用药仍请按医嘱核对。",
+        "emotion": "neutral",
+        "gesture": null,
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1126
+    },
+    {
+      "scenario": "medicine_to_daily_schedule",
+      "user": "降压药有什么注意事项",
+      "answer": {
+        "intent": "other",
+        "action": "continue",
+        "reply": "降压药的注意事项是不要因为一次血压正常就自行停药或加减量，服后明显头晕应联系医护核对。个人剂量请以处方或药师核对结果为准。",
+        "emotion": "neutral",
+        "gesture": "raise_right",
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1099
+    },
+    {
+      "scenario": "contextual_gestures",
+      "user": "请向我挥挥手",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "好的，这就向您挥手。",
+        "emotion": "happy",
+        "gesture": "wave_hands",
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1864
+    },
+    {
+      "scenario": "contextual_gestures",
+      "user": "请用双手给我比个心",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "好的，这就用双手给您比心。",
+        "emotion": "happy",
+        "gesture": "heart_both",
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1109
+    },
+    {
+      "scenario": "contextual_gestures",
+      "user": "我今天按计划完成了阅读和散步，感觉很开心。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "真好呀，完成计划的感觉真不错呢。",
+        "emotion": "happy",
+        "gesture": "clap",
+        "_reminder_transition": {
+          "pending_question": null
+        }
+      },
+      "generation_ms": 1333
+    }
+  ]
+}
