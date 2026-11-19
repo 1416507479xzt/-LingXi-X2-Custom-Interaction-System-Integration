@@ -117,6 +117,41 @@ class AimdkPresentation:
         self.clients = {k: self.node.create_client(v, SERVICES[k]) for k, v in self.types.items()}
         self.lock = asyncio.Lock()
         self.last_motion = float("-inf")
+        self.face_state = None
+        self.face_subscription = None
+        try:
+            from aimdk_msgs.msg import FaceEmojiStatus
+            from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+        except ImportError:
+            pass  # Missing observer never permits an uncertain retry.
+        else:
+            qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT,
+                             durability=DurabilityPolicy.VOLATILE)
+            self.face_subscription = self.node.create_subscription(
+                FaceEmojiStatus, "/face_ui_proxy/status", self._on_face_status, qos)
+
+    def _on_face_status(self, msg):
+        stamp = msg.header.stamp
+        self.face_state = {"priority": msg.priority, "e_id": msg.e_id,
+                           "published_ns": stamp.sec * 1_000_000_000 + stamp.nanosec,
+                           "seen_at": time.monotonic()}
+
+    async def _wait_display_clear(self, allowed, *, since, timeout=6):
+        if getattr(self, "face_subscription", None) is None:
+            return False
+        deadline = time.monotonic() + timeout
+        since_ns = self.node.get_clock().now().nanoseconds
+        while time.monotonic() < deadline and allowed():
+            self.ros.spin_once(self.node, timeout_sec=0)
+            state = self.face_state
+            # A fresh event after the explicit rejection is required. Never
+            # interpret silence or old volatile status as proof of an idle face.
+            if (state and state["seen_at"] >= since
+                    and state.get("published_ns", -1) >= since_ns
+                    and state["priority"] <= 1):
+                return True
+            await asyncio.sleep(.01)
+        return False
 
     async def _call(self, kind, req, timeout=.6):
         client = self.clients[kind]
@@ -143,13 +178,31 @@ class AimdkPresentation:
                 req = self.types["emoji"].Request()
                 req.emotion_id = EMOJI_IDS[emotion]
                 req.mode = 1  # once, never indefinite loop
-                req.priority = 1  # must not mask system fault indications (8/10)
+                req.priority = 1  # never raise priority to cover system display items
                 response = await self._call("emoji", req)
+                attempts, wait_ms, first_message = 1, 0, ""
+                # Only an explicit priority rejection proves no display write
+                # was accepted. A timeout or other rejection is never retried.
+                message = str(getattr(response, "message", "")) if response is not None else ""
+                if (not self.enable_motion and response is not None and not response.success
+                        and "优先级低于当前播放" in message
+                        and "Current priority:" in message):
+                    first_message = message[:240]
+                    wait_start = time.monotonic()
+                    clear = await self._wait_display_clear(allowed, since=wait_start)
+                    wait_ms = round((time.monotonic() - wait_start) * 1000)
+                    if clear and allowed():
+                        attempts = 2
+                        response = await self._call("emoji", req)
                 receipt = {"kind": "emotion", "name": emotion,
                            "emotion_id": req.emotion_id,
                            "mode": req.mode, "priority": req.priority,
+                           "attempts": attempts, "wait_ms": wait_ms,
                            "status": "unknown" if response is None else
                            ("accepted" if response.success else "rejected")}
+                if first_message:
+                    receipt["initial_message"] = first_message
+                    receipt["deferred"] = True
                 if response is not None:
                     # This SDK's CommonResponse header is not the success flag.
                     # Keep the actual rejection explanation, not only a boolean.

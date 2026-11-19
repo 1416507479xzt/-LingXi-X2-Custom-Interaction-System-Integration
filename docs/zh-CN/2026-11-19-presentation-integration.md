@@ -92,3 +92,14 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 用户只读查询确认 /face_ui_proxy/status 的发布者为 face_ui_proxy，QoS 为 RELIABLE + VOLATILE；订阅者 app_proxy、soc0_task_manager4288 为 BEST_EFFORT + VOLATILE。此前依据可访问1.1文档给出的TRANSIENT_LOCAL订阅触发DURABILITY不兼容警告，未收到消息。这是诊断命令的参数不匹配，不是话题不存在或播放服务故障。
 
 后续诊断必须使用 --qos-reliability best_effort --qos-durability volatile，订阅建立后再触发实际显示事件。VOLATILE不保证返回订阅前的历史消息，空闲时超时没有输出不能证明没有优先级60。task_manager在此是订阅者，不能用该列表认定它是优先级60的请求来源。仍未提高优先级或改动系统模块。
+
+
+## 优先级60的播放内容与有界协调实现
+
+用户在自研Agent停止时，用BEST_EFFORT + VOLATILE成功取得20秒状态样本：默认眨眼/平静为priority0、mode2；其间交替出现adore(id200)和thinking(id170)，priority60、mode1，随后回落至priority0。证明高优先级项不是持续占用，本次样本的素材属于已知表情；未取得调用者或trace_id，不把具体发起模块写成定论。
+
+新增协调只在仅表情模式生效：第一次请求若明确收到success=False且message包含“优先级低于当前播放”和Current priority，则订阅同一节点上的FaceEmojiStatus（BEST_EFFORT/VOLATILE），后台最多等待6秒。必须收到拒绝后的新低优先级事件（priority<=1），接收时间及消息header.stamp均通过新鲜度检查，才以同一id/mode/priority1再尝试一次。最多共两次调用；等待超时、无状态类型、失去控制权、其他拒绝、无响应或结果不明时不重发。不依赖time_to_end_ms猜测空闲，不关闭系统模块或覆盖priority60及其他高优先级显示。消息时间戳与ROS时钟不一致时可能保守跳过，不能把它当作显示成功。
+
+下一轮表现计划到来时，仅表情模式取消旧的等待任务（包括下一轮选择null），避免积压过时表情；显式肢体动作模式保持不替换在途计划，且不使用上述表情等待重发流程。语音不等待这6秒，实际表情可能晚于语音开始，也可能因没有空闲窗口被跳过；不承诺严格同步。
+
+203项相关离线回归通过，包含明确拒绝后低优先级重试、保持priority1、未获空闲不重发、旧接收/发布状态不作为空闲依据、控制权丢失、等待取消释放锁及新轮次替换。暂无更新后的真机结果。需要同时更新presentation.py和agent.py，使用新离线包部署，再重复问候、疲惫及食堂确认；核对attempts、wait_ms、message及实际屏幕/语音效果。

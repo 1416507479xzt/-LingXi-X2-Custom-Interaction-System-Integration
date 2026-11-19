@@ -84,6 +84,7 @@ class ExpressionOnlyTests(unittest.IsolatedAsyncioTestCase):
     async def test_ros_wait_does_not_block_speech_and_duplicate_plans_are_not_queued(self):
         agent = object.__new__(DoubaoAgent)
         agent.presentation_backend = Mock()
+        agent.args = NS(enable_robot_motion=True)
         agent._presentation_tasks = set()
         started, release = asyncio.Event(), asyncio.Event()
         async def slow(*args):
@@ -100,6 +101,98 @@ class ExpressionOnlyTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.gather(*agent._presentation_tasks)
         await asyncio.sleep(0)
         self.assertEqual(agent._presentation_tasks, set())
+
+    def deferred_backend(self):
+        backend = object.__new__(AimdkPresentation)
+        backend.enable_motion = False
+        backend.lock = asyncio.Lock()
+        backend.types = {'emoji': NS(Request=lambda: NS())}
+        return backend
+
+    async def test_explicit_priority_rejection_retries_once_after_clear_without_raising_priority(self):
+        backend = self.deferred_backend()
+        backend._call = AsyncMock(side_effect=[
+            NS(success=False, message='优先级低于当前播放，操作被忽略, extra: Current priority: 60, request priority: 1'),
+            NS(success=True, message='成功')])
+        backend._wait_display_clear = AsyncMock(return_value=True)
+        results = await backend.dispatch('sympathy', None, lambda: True)
+        self.assertEqual(results[0]['status'], 'accepted')
+        self.assertEqual(results[0]['attempts'], 2)
+        self.assertEqual(results[0]['priority'], 1)
+        self.assertEqual(backend._call.await_count, 2)
+        backend._wait_display_clear.assert_awaited_once()
+        for call in backend._call.call_args_list:
+            self.assertEqual(call.args[1].priority, 1)
+
+    async def test_no_clear_event_means_no_retry(self):
+        backend = self.deferred_backend()
+        backend._call = AsyncMock(return_value=NS(success=False,
+            message='优先级低于当前播放, Current priority: 60'))
+        backend._wait_display_clear = AsyncMock(return_value=False)
+        results = await backend.dispatch('sympathy', None, lambda: True)
+        self.assertEqual(results[0]['status'], 'rejected')
+        self.assertEqual(results[0]['attempts'], 1)
+        backend._call.assert_awaited_once()
+
+    async def test_stale_idle_status_and_high_priority_do_not_allow_retry(self):
+        import time
+        backend = self.deferred_backend()
+        backend.face_subscription = object()
+        backend.face_state = {'priority': 0, 'seen_at': time.monotonic()-10}
+        backend.ros = NS(spin_once=Mock())
+        backend.node = NS(get_clock=lambda: NS(now=lambda: NS(nanoseconds=100)))
+        self.assertFalse(await backend._wait_display_clear(
+            lambda: True, since=time.monotonic(), timeout=.02))
+        backend._on_face_status(NS(priority=0, e_id=1,
+                                   header=NS(stamp=NS(sec=0, nanosec=99))))
+        self.assertFalse(await backend._wait_display_clear(
+            lambda: True, since=0, timeout=.02))
+        backend._on_face_status(NS(priority=60, e_id=170,
+                                   header=NS(stamp=NS(sec=0, nanosec=101))))
+        self.assertFalse(await backend._wait_display_clear(
+            lambda: True, since=0, timeout=.02))
+        backend._on_face_status(NS(priority=0, e_id=1,
+                                   header=NS(stamp=NS(sec=0, nanosec=102))))
+        self.assertTrue(await backend._wait_display_clear(
+            lambda: True, since=0, timeout=.02))
+        self.assertFalse(await backend._wait_display_clear(
+            lambda: False, since=0, timeout=.02))
+
+    async def test_cancellation_of_deferred_expression_releases_lock_without_retry(self):
+        backend = self.deferred_backend()
+        backend._call = AsyncMock(return_value=NS(success=False,
+            message='优先级低于当前播放, Current priority: 60'))
+        entered = asyncio.Event()
+        async def wait(*args, **kwargs):
+            entered.set()
+            await asyncio.sleep(10)
+        backend._wait_display_clear = wait
+        task = asyncio.create_task(backend.dispatch('sympathy', None, lambda: True))
+        await entered.wait()
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertFalse(backend.lock.locked())
+        backend._call.assert_awaited_once()
+
+    async def test_new_turn_replaces_old_expression_wait_including_null_selection(self):
+        agent = object.__new__(DoubaoAgent)
+        agent.presentation_backend = Mock()
+        agent.args = NS(enable_robot_motion=False)
+        agent._presentation_tasks = set()
+        started = asyncio.Event()
+        async def dispatch(*args):
+            if args[1] == 'old':
+                started.set()
+                await asyncio.sleep(10)
+        agent._dispatch_model_presentation = AsyncMock(side_effect=dispatch)
+        await agent._model_presentation(None, 'old', 'i', DialogueReply('旧轮次'))
+        await started.wait()
+        old = next(iter(agent._presentation_tasks))
+        await agent._model_presentation(None, 'new', 'i', DialogueReply('新轮次'))
+        self.assertTrue(old.cancelled())
+        await asyncio.gather(*agent._presentation_tasks)
+        self.assertEqual(agent._dispatch_model_presentation.await_count, 2)
 
     async def test_close_cancels_inflight_expression_before_destroying_ros(self):
         agent = object.__new__(DoubaoAgent)

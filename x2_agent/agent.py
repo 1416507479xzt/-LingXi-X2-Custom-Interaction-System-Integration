@@ -330,10 +330,17 @@ class DoubaoAgent:
     async def _model_presentation(self, ws, event_id, item_id, presentation):
         if self.presentation_backend is not None:
             # Do not make the first speech PCM wait for a ROS service reply.
-            # Keep at most one in-flight plan; never queue stale movements.
+            # Keep one current plan. Expression-only waits may be replaced;
+            # an in-flight motion is never replaced or automatically resent.
             if self._presentation_tasks:
-                logger.info("agent     表现请求仍在处理，跳过新表现；继续语音")
-                return
+                if getattr(self.args, "enable_robot_motion", False):
+                    logger.info("agent     表现请求仍在处理，跳过新表现；继续语音")
+                    return
+                old_tasks = tuple(self._presentation_tasks)
+                for task in old_tasks:
+                    task.cancel()
+                await asyncio.gather(*old_tasks, return_exceptions=True)
+                logger.info("agent     已取消上一轮等待中的表情，使用本轮选择")
             task = asyncio.create_task(self._dispatch_model_presentation(
                 ws, event_id, item_id, presentation))
             self._presentation_tasks.add(task)
