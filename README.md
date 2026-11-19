@@ -43,6 +43,10 @@ python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
 
 早期排查过程保留在[ASR 完整性记录](docs/zh-CN/2026-11-18-x2-asr-diagnosis.md)、[回答与延迟优化记录](docs/zh-CN/2026-11-18-dialogue-latency-optimization.md)及[2026-11-08 联调记录](docs/zh-CN/2026-11-08-x2-real-robot-integration.md)，用于追溯问题与比较版本，不代表当前只完成了两轮问答。
 
+## 后续开发：表情与动作
+
+2026-11-19 开始在第三版语音基线上核对机载表情/动作接口。当前零力矩，仅准备表情单项测试；动作目录存在版本差异，尚未启用或验收。详见[本轮接入记录](docs/zh-CN/2026-11-19-presentation-integration.md)。
+
 ## 原生交互模块：切换、重启与恢复
 
 以下是手头 X2 Ultra / AimDK v1.0.0 已验证过的操作流程。**PC2 负责调用模式设置服务，PC3 负责重启原生 agent。** 两台机器的提示符都可能是 `agi@agi`，不能只靠提示符区分：登录横幅中 PC2 为 SoC1，PC3 为 SoC2。这里重启的是原生交互应用，不是重启整台机器人，也不删除原生代码。
