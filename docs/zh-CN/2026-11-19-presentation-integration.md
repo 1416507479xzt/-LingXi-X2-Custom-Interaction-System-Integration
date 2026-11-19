@@ -210,3 +210,10 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 ```
 
 先“你好灵犀”，开场期间如已挥手则等完全收回、至少8秒后再发新动作请求；否则回答结束后说“请挥挥右手”。观察语音、表情、实际动作及站立；不要连续快速重复动作请求。之后再测试疲惫回答和食堂确认，检查无手势轮次表情及反馈记录不退化。结束Ctrl+C，执行unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS；需要恢复原生问答时按README恢复normal。结果不明先观察并查日志，不反复唤起同一动作。
+
+
+## 主Agent联动首轮回执（11:16—11:17）
+
+用户部署并预检后启动带--enable-robot-motion的主Agent：11:16:58同一表现计划中，neutral(id10/priority1)一次accepted，同时wave_hands返回accepted、code0、task_id0、state400。11:17:17的下一条纯表情neutral计划先因priority60拒绝，等待915ms后以priority1第二次请求accepted。
+
+这些回执证明主Agent已实际发出并收到右挥手的服务受理、开启肢体动作后纯表情协调仍有成功样本；915ms仅为表情协调等待，不是端到端语音延迟。state400仍不等于动作完成。本次已向用户核对实际挥手收回、站立、语音与表情，尚待现场观察回复；未将服务accepted直接标成完整联动验收通过。
