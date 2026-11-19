@@ -85,3 +85,10 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 仍未知priority60播放项的素材、发起模块、有效时段及是否含系统状态提示。不能把显示优先级60当作表情编号60，也不能推断它来自音频焦点优先级6；两者是不同接口的参数。下一步只读查看/face_ui_proxy/status的发布者、QoS及当前播放状态，必要时做对话期间对照，再选择协调办法。当前没有提高表情优先级、关闭task_manager/interaction_slave、修改原生SDK或启用肢体动作。
 
 当前可访问的[官方屏幕文档](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/interactor/screen.html)标为1.1.0，说明低优先级请求会被忽略，并提醒高优先级覆盖可能遮挡系统提示；本机具体priority60来源必须依据1.0.0实测核对，不把新版文档中的系统优先级数值当作本机全量配置。
+
+
+## 状态采集QoS修正（机载1.0.0）
+
+用户只读查询确认 /face_ui_proxy/status 的发布者为 face_ui_proxy，QoS 为 RELIABLE + VOLATILE；订阅者 app_proxy、soc0_task_manager4288 为 BEST_EFFORT + VOLATILE。此前依据可访问1.1文档给出的TRANSIENT_LOCAL订阅触发DURABILITY不兼容警告，未收到消息。这是诊断命令的参数不匹配，不是话题不存在或播放服务故障。
+
+后续诊断必须使用 --qos-reliability best_effort --qos-durability volatile，订阅建立后再触发实际显示事件。VOLATILE不保证返回订阅前的历史消息，空闲时超时没有输出不能证明没有优先级60。task_manager在此是订阅者，不能用该列表认定它是优先级60的请求来源。仍未提高优先级或改动系统模块。
