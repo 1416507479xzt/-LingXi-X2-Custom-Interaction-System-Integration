@@ -134,3 +134,12 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 后续优先比较二开SDK与机载运行服务的动作请求定义。当前PC2二开环境SetMcPresetMotion没有input_source；可访问的1.1官方变更记录说明该字段为新增预留字段。机载服务是否使用含该字段的定义尚未核实，只有版本差异假设，不能据此直接安装新版SDK或修改消息。应先只读定位 /agibot/software 中实际部署的 .srv/.idl，对比字段顺序。GetMcAction能通信不代表所有srv均匹配。
 
 官方1.1预设动作文档还明确，GetCurrentInputSource不能用来查询谁在控制预设动作；不能据此将修改输入源当作挥手修复的先决条件。此项引用仅用于排查边界，不把1.1的结构直接套到本机。参考[变更记录](https://x2-aimdk.agibot.com/zh-cn/latest/changelog.html)及[预设动作](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/preset_motion.html)。
+
+
+## 原生消息环境探查受阻，保留原二开环境
+
+PC2用户直接查看 /agibot/software/v0/common 和share返回Permission denied。此前Path.rglob未找到接口文件不能作为文件不存在的证据，也未取得服务端schema。aima em load-env --source-msgs无参实际报requires an argument；help虽有无参说明，但该安装版本实际要求TEXT。用户因此未进入子shell，随后exit退出了原SSH，未停止任何机器人服务。
+
+重连后使用 --source-msgs common（符合实际help的参数形式），工具报File not found: /agibot/software/v0/entry/bin/cfg/env.yaml，仍未成功建立原生环境。此后新SSH中import aimdk_msgs失败，是当前终端尚未加载二开SDK的结果之一，不能认定原SDK损坏或需要重装。先 source /home/agi/aimdk/install/local_setup.bash 恢复已验证环境。
+
+截至此时，动作schema不一致仍是待验证假设。停止此条加载路线，不创建伪造env.yaml、不改目录权限、不sudo加载整个交互环境、不重编译或替换原生SDK。下一步按官方机内拓扑登录PC1（需以登录横幅核对），只读查看mc应用配置及show-log帮助，依据真实路径查请求时间段日志。原单次动作请求结果仍未明，不重发，不切换运动模式或停运控进程。
