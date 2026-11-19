@@ -150,3 +150,14 @@ PC2用户直接查看 /agibot/software/v0/common 和share返回Permission denied
 用户明确提醒PC1不能作为二开开发环境。核对[官方计算单元说明](https://x2-aimdk.agibot.com/zh-cn/latest/about_agibot_X2/onboard_computer.html)，官方明确禁止使用运控计算单元PC1作为二开程序开发运行环境。官方这条原文针对开发运行环境，不能改写成“所有只读登录均被官方禁止”；但本项目没有必要为当前排查进入PC1，因此撤回此前只读登录建议，后续不要求操作者登录PC1，不在其上部署、安装、修改、停止或重启MC。
 
 本项目二开程序继续在PC2运行。PC3仅沿已验证流程进行原生交互模式生效所需的agent重启，不能类推成允许操作PC1运控模块。此前动作无响应及schema兼容性仍未解决，不将开发边界纠正写成动作问题已经修复。
+
+
+## PC2只读动作诊断入口
+
+新增 scripts/aimdk_motion_diagnostic.py，完全留在PC2运行：打印二开SDK来源/版本及动作相关请求/响应字段、图中服务提供方、已安装preset例程路径；使用一个ROS节点只查询GetMcAction和（类型存在时）GetSystemState。查询每项只发一次，发现和响应等待有界；无类型/无服务/超时分别报告，不自动迁移系统状态或切换运动模式。
+
+脚本从不创建SetMcPresetMotion、SetMcAction、SetMcInputSource或MigrateSystemState写客户端，不发送挥手、不加载原生环境、不访问PC1、不读取.env、不联系云服务。四项离线测试覆盖写接口被拒绝、超时不重发及清理、服务缺失时不发送、正常只读响应。诊断已纳入离线包，但仅更新该脚本即可使用；无需重新部署已验证业务代码。
+
+依据[官方Python例程](https://x2-aimdk.agibot.com/zh-cn/latest/example/Python.html)关注跨板ROS服务问题；只读模式查询使用当前时间戳。不把文档中的重试写法未经核对直接用于结果不明的动作请求。当前仍未查明挥手无响应的根因，SDK版本差异仅为假设，等待诊断输出。
+
+PC2加载原SDK后执行：python3 /home/agi/eldercare-x2/eldercare_x2/scripts/aimdk_motion_diagnostic.py。该脚本不依赖Agent运行，保持自研Agent停止，完成后把JSON输出作为下一步判断依据。

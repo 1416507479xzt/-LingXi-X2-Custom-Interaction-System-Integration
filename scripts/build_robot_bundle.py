@@ -89,6 +89,7 @@ def build(wheelhouse, output):
                    ROOT / "scripts" / "aimdk_asr_diagnostic.py",
                    ROOT / "scripts" / "aimdk_tts_probe.py",
                    ROOT / "scripts" / "robot_preflight.py",
+                   ROOT / "scripts" / "aimdk_motion_diagnostic.py",
                    ROOT / "scripts" / "run_robot_agent.py",
                    ROOT / "docs" / "zh-CN" / "onsite-deployment.md",
                    ROOT / "docs" / "zh-CN" / "reproduce-on-x2.md",
