@@ -68,14 +68,14 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("clap", unity["gestures"])
         self.assertNotIn("clap", aimdk["gestures"])
         self.assertEqual(set(aimdk["gestures"]),
-                         {"wave_hands", "wave_left", "raise_right", "raise_left"})
+                         {"wave_hands"})
         self.assertEqual(MOTIONS["clap"], (3017, 11))
         self.assertEqual(MOTIONS["heart_both"], (1007, 3))
         self.assertEqual(EMOJI_IDS["neutral"], 10)
         self.assertEqual(EMOJI_IDS["sympathy"], 120)
         self.assertEqual(capabilities(False, "aimdk")["gestures"], [])
         self.assertEqual(unity["explanation_gestures"], ["open_arms"])
-        self.assertEqual(aimdk["explanation_gestures"], ["raise_right", "raise_left"])
+        self.assertEqual(aimdk["explanation_gestures"], [])
         self.assertEqual(capabilities(False)["explanation_gestures"], [])
 
     def test_model_can_choose_expanded_but_not_unavailable_capabilities(self):
@@ -83,7 +83,7 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(self.validate(emotion=emotion, gesture="open_arms"))
         self.assertIsNone(self.validate(gesture="clap"))
         self.ctx["capabilities"] = capabilities(backend="aimdk", enable_motion=True)
-        self.assertIsNotNone(self.validate(emotion="thinking", gesture="raise_right"))
+        self.assertIsNotNone(self.validate(emotion="thinking", gesture="wave_hands"))
         self.assertIsNone(self.validate(emotion="thinking", gesture="heart_both"))
         self.assertEqual(unity_plan("neutral", "open_arms", "您好"),
                          [("emotion", "neutral", {}), ("gesture", "open_arms", {})])
@@ -271,7 +271,10 @@ class AimdkTests(unittest.IsolatedAsyncioTestCase):
         b.lock = asyncio.Lock()
         b.enable_motion = True
         b.last_motion = float("-inf")
-        b.types = {k: NS(Request=lambda: NS(motion=NS(value=0), area=NS(value=0)))
+        b.node = NS(get_clock=lambda: NS(now=lambda: NS(to_msg=lambda: "current_stamp")))
+        b.types = {k: NS(Request=lambda: NS(motion=NS(value=0), area=NS(value=0),
+                                            header=NS(stamp=None),
+                                            request=NS(header=NS(stamp=None))))
                    for k in ("emoji", "motion", "mode")}
         calls = []
         async def call(kind, req):
@@ -292,6 +295,10 @@ class AimdkTests(unittest.IsolatedAsyncioTestCase):
         emoji, motion = calls[0][1], calls[2][1]
         self.assertEqual((emoji.emotion_id, emoji.mode, emoji.priority), (120, 1, 1))
         self.assertEqual((motion.motion.value, motion.area.value, motion.interrupt), (1002, 2, False))
+        self.assertEqual(motion.header.stamp, "current_stamp")
+        self.assertEqual(motion.play_timestamp, 0)
+        self.assertEqual(calls[1][1].request.header.stamp, "current_stamp")
+        self.assertEqual(receipts[1]['task_id'], 23)
         await b.dispatch(None, "wave_hands", lambda: True)
         self.assertEqual(sum(k == "motion" for k, _ in calls), 1)
 

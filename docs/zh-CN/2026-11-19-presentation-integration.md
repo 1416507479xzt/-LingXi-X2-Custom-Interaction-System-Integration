@@ -183,3 +183,30 @@ SDK仍是/home/agi/aimdk/install的v1.0.0-ga424add；SetMcPresetMotion请求不�
 四项探针离线测试通过，连同五项只读诊断测试共九项：默认不创建写客户端、零力矩/切换中阻止、单次当前时间戳及任务响应保留、超时清理且不重发。真实挥手仍待用户执行单次探针并观察，现有生产语音/表情和动作开关不变。
 
 部署只需将scripts/aimdk_motion_probe.py复制到PC2项目scripts目录。先加载原SDK，默认运行脚本不加参数可只读核对；现场确认站稳、手臂空间和急停操作条件后，才单次运行 python3 scripts/aimdk_motion_probe.py --execute。若未知结果，先观察并回传JSON，不重复执行。
+
+
+## 单次右手挥手实际通过及主Agent接入准备
+
+用户执行新版单次探针，模式查询code0、STAND_DEFAULT/status100；motion_requests=1，动作服务有response：code0、task_id0、state400。state400为RUNNING，不是完成回执；task_id0也不能当作可靠非零任务关联ID。随后用户明确确认“完整挥手并收回，站立稳定”，单项右手挥手由服务响应和实际观察共同验证。
+
+这次使用当前时间戳的单节点单次请求成功，之前零时间戳CLI无响应；但两次工具、发现等待和调用时机也不同，不是严格同条件A/B，不能宣称时间戳就是唯一根因。无需更换或重编译SDK，也没有访问PC1。此前版本不兼容假设未被证明，现有SDK已能跑通这个动作。
+
+主Agent同步采用当前请求时间戳，play_timestamp0、interruptFalse，GetMcAction前也填当前时间；动作响应等待上限8秒（模式3秒、表情0.6秒），只等待不重发。日志保留code/task_id/state，不宣称动作完成。每次动作仍重新核对稳定站立及8秒冷却。运行时动作白名单现在仅已实际验证的右手挥手wave_hands（1002/2），左手、举手等参考映射不开放。
+
+开启总动作开关后，无手势的纯表情计划继续使用priority60协调；带手势计划不等待表情空闲，避免延后执行旧动作。正在等待的旧纯表情计划可被新计划替换，但在途肢体计划不取消、不排队重发。模型可选null，不强制开场挥手；需要用明确“请挥挥右手”先验收联动。
+
+214项相关离线回归通过，包括生产时间戳/任务回执、未实测动作阻止、动作开关开启时纯表情协调仍可用及原语音/食堂回归。本次仅探针实际通过，更新后的主Agent语音/表情/挥手联动仍待部署测试，第三版标签保留不动。
+
+## 主Agent右手挥手联动命令（单项通过后）
+
+上传并解压新版完整ZIP、source机载SDK、预检通过。自研Agent停止时实际核对only_voice状态（若原生仍回答，先按README流程切换），由现场人员确认稳定站立、手臂活动空间与急停条件。PC2项目目录启动：
+
+```bash
+mkdir -p logs
+SESSION_ID=$(date +%Y%m%d_%H%M%S)
+export DOUBAO_ASR_HOTWORDS='["灵犀"]'
+export X2_ONLY_VOICE_CONFIRMED=1
+python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend aimdk --enable-robot-presentation --enable-robot-motion --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback.jsonl --log-file "logs/motion_${SESSION_ID}.log" --metrics-file "logs/motion_${SESSION_ID}_metrics.json"
+```
+
+先“你好灵犀”，开场期间如已挥手则等完全收回、至少8秒后再发新动作请求；否则回答结束后说“请挥挥右手”。观察语音、表情、实际动作及站立；不要连续快速重复动作请求。之后再测试疲惫回答和食堂确认，检查无手势轮次表情及反馈记录不退化。结束Ctrl+C，执行unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS；需要恢复原生问答时按README恢复normal。结果不明先观察并查日志，不反复唤起同一动作。

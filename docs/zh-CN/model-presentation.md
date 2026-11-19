@@ -38,7 +38,7 @@ python agent.py --competition-mode --health-semantic model --presentation-backen
 
 Unity目前只有六种视觉表情、两种动作；sympathy与admiration都近似显示爱心，
 不是不同的动画。不能把SDK的200“崇拜”误作同情。
-源码保留20种表情和历史预设动作映射供参考；主分支运行时不开放未经机载核对的全部动作。默认仅表情，显式动作开关也仅开放已核对的左右挥手/举手，见`x2_agent/presentation.py`。
+源码保留20种表情和历史预设动作映射供参考；主分支运行时不开放未经机载核对的全部动作。默认仅表情，显式动作开关也仅开放已实测右手挥手，见`x2_agent/presentation.py`。
 没有开放伪造故障/充电状态、握手等接触动作或行走控制。
 目录按后端传给模型，并包含语义说明；不向Unity宣称它具有全部真机动画。
 本次Python修改不会为便携版模拟器增加动画，需要新增动画时必须修改Unity工程并重新构建。
@@ -53,7 +53,7 @@ Unity目前只有六种视觉表情、两种动作；sympathy与admiration都近
 代码提供可选 `--presentation-backend aimdk`，仅处理表情与预设动作。它依赖PC2上的
 ROS2/rclpy和匹配固件的aimdk_msgs，Windows仿真不导入这些依赖。
 启用还需要显式传入`--enable-robot-presentation`，并使用竞赛model模式。
-真机音频现已通过 --transport aimdk 接入，操作以[复现指南](reproduce-on-x2.md)为准。2026-11-19起，--enable-robot-presentation默认只开放表情；肢体动作另需--enable-robot-motion。机载字段核对后只开放左右挥手/举手，零力矩时不执行；本轮对话联动与动作仍待实测，见[接入记录](2026-11-19-presentation-integration.md)。
+真机音频现已通过 --transport aimdk 接入，操作以[复现指南](reproduce-on-x2.md)为准。2026-11-19起，--enable-robot-presentation默认只开放表情；肢体动作另需--enable-robot-motion。当前只开放已实测右手挥手，零力矩时不执行；单项已实际完成，主Agent完整联动仍待复测，见[接入记录](2026-11-19-presentation-integration.md)。
 
 接口：
 - `/aimdk_5Fmsgs/srv/PlayEmoji`：mode=1单次，priority=1，不覆盖系统故障高优先级提示；

@@ -85,13 +85,14 @@ class ExpressionOnlyTests(unittest.IsolatedAsyncioTestCase):
         agent = object.__new__(DoubaoAgent)
         agent.presentation_backend = Mock()
         agent.args = NS(enable_robot_motion=True)
+        agent._presentation_has_motion = True
         agent._presentation_tasks = set()
         started, release = asyncio.Event(), asyncio.Event()
         async def slow(*args):
             started.set()
             await release.wait()
         agent._dispatch_model_presentation = AsyncMock(side_effect=slow)
-        reply = DialogueReply('您好')
+        reply = DialogueReply('您好', gesture='wave_hands')
         await asyncio.wait_for(agent._model_presentation(None, 'e', 'i', reply), .1)
         await started.wait()
         self.assertEqual(len(agent._presentation_tasks), 1)
@@ -123,6 +124,25 @@ class ExpressionOnlyTests(unittest.IsolatedAsyncioTestCase):
         backend._wait_display_clear.assert_awaited_once()
         for call in backend._call.call_args_list:
             self.assertEqual(call.args[1].priority, 1)
+
+    async def test_expression_only_plan_still_defers_when_global_motion_is_enabled(self):
+        backend = self.deferred_backend()
+        backend.enable_motion = True
+        backend._call = AsyncMock(side_effect=[NS(success=False,
+            message='优先级低于当前播放, Current priority: 60'), NS(success=True, message='成功')])
+        backend._wait_display_clear = AsyncMock(return_value=True)
+        results = await backend.dispatch('sympathy', None, lambda: True)
+        self.assertEqual(results[0]['status'], 'accepted')
+        self.assertEqual(results[0]['attempts'], 2)
+        self.assertEqual([c.args[0] for c in backend._call.call_args_list], ['emoji','emoji'])
+
+    async def test_untested_left_hand_motion_is_blocked_before_any_rpc(self):
+        backend = self.deferred_backend()
+        backend.enable_motion = True
+        backend._call = AsyncMock()
+        results = await backend.dispatch(None, 'wave_left', lambda: True)
+        self.assertEqual(results[0]['status'], 'blocked')
+        backend._call.assert_not_awaited()
 
     async def test_no_clear_event_means_no_retry(self):
         backend = self.deferred_backend()

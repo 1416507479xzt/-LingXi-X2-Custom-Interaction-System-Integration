@@ -189,6 +189,7 @@ class DoubaoAgent:
     def __init__(self, args):
         self.args = args
         self._presentation_tasks = set()
+        self._presentation_has_motion = False
         self.presentation_backend = (AimdkPresentation(
             enable_motion=getattr(args, "enable_robot_motion", False))
             if getattr(args, "presentation_backend", "unity") == "aimdk" else None)
@@ -333,7 +334,7 @@ class DoubaoAgent:
             # Keep one current plan. Expression-only waits may be replaced;
             # an in-flight motion is never replaced or automatically resent.
             if self._presentation_tasks:
-                if getattr(self.args, "enable_robot_motion", False):
+                if getattr(self, "_presentation_has_motion", False):
                     logger.info("agent     表现请求仍在处理，跳过新表现；继续语音")
                     return
                 old_tasks = tuple(self._presentation_tasks)
@@ -341,6 +342,8 @@ class DoubaoAgent:
                     task.cancel()
                 await asyncio.gather(*old_tasks, return_exceptions=True)
                 logger.info("agent     已取消上一轮等待中的表情，使用本轮选择")
+            self._presentation_has_motion = bool(
+                presentation.gesture and getattr(self.args, "enable_robot_motion", False))
             task = asyncio.create_task(self._dispatch_model_presentation(
                 ws, event_id, item_id, presentation))
             self._presentation_tasks.add(task)

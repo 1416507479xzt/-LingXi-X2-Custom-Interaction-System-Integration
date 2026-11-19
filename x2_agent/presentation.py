@@ -30,9 +30,9 @@ EMOTION_MEANINGS = dict(zip(EMOJI_IDS, [
     "悲伤，仅在语境确实合适时，不能把身体疲劳等同悲伤", "同情和关怀，不应每轮重复",
     "疑惑", "震惊，不夸大健康风险", "撒娇，谨慎使用", "严肃", "思考",
     "愤怒，不对长者发怒", "崇拜和赞赏，不等于同情"]))
-# Only these motion/area pairs have been checked against the supplied v1.0.0 types.
-VERIFIED_MOTIONS = {name: MOTIONS[name] for name in
-                    ("wave_hands", "wave_left", "raise_right", "raise_left")}
+# Runtime catalog is limited to the physically verified right-hand wave.
+# Other mappings above are references, not enabled robot capabilities.
+VERIFIED_MOTIONS = {"wave_hands": MOTIONS["wave_hands"]}
 GESTURE_MEANINGS = dict(zip(MOTIONS, [
     "右手挥手，问候或告别", "左手挥手", "右手举手", "左手举手",
     "鼓掌，祝贺或鼓励", "右手敬礼", "左手敬礼", "双手比心，表达关怀",
@@ -66,7 +66,7 @@ def capabilities(control=True, backend="unity", *, enable_motion=False):
             "explanation_note": (
                 "肢体动作未开启；只可选择屏幕表情，gesture必须为null。"
                 if backend == "aimdk" and not enable_motion else
-                "可用举手作一次讲解强调，不是指点、摊掌或治疗示范；不保证小幅度动作，需保持安全距离。"
+                "当前只开放右手挥手，用于招呼或告别，不是讲解手势；不要每轮建议都挥手。"
                 if backend == "aimdk" else
                 "open_arms是已有的双臂展开动画，可近似配合一次友善说明，不是专门的摊掌讲解动画。"
                 "wave_hands只用于招呼/告别，不用来反复解释健康建议。"),
@@ -153,7 +153,9 @@ class AimdkPresentation:
             await asyncio.sleep(.01)
         return False
 
-    async def _call(self, kind, req, timeout=.6):
+    async def _call(self, kind, req, timeout=None):
+        if timeout is None:
+            timeout = {"motion": 8, "mode": 3}.get(kind, .6)
         client = self.clients[kind]
         if not client.service_is_ready():
             return None
@@ -184,7 +186,7 @@ class AimdkPresentation:
                 # Only an explicit priority rejection proves no display write
                 # was accepted. A timeout or other rejection is never retried.
                 message = str(getattr(response, "message", "")) if response is not None else ""
-                if (not self.enable_motion and response is not None and not response.success
+                if (gesture is None and response is not None and not response.success
                         and "优先级低于当前播放" in message
                         and "Current priority:" in message):
                     first_message = message[:240]
@@ -217,19 +219,29 @@ class AimdkPresentation:
                     return results
                 status = "blocked"
                 if allowed() and time.monotonic() - self.last_motion >= 8:
-                    state = await self._call("mode", self.types["mode"].Request())
+                    mode_request = self.types["mode"].Request()
+                    mode_request.request.header.stamp = self.node.get_clock().now().to_msg()
+                    state = await self._call("mode", mode_request)
                     if (state is not None and state.header.code == 0
                             and state.info.action_desc == "STAND_DEFAULT"
                             and state.info.status.value == 100 and allowed()):
                         req = self.types["motion"].Request()
                         req.motion.value, req.area.value = VERIFIED_MOTIONS[gesture]
                         req.interrupt = False
-                        # Default zero stamp means immediate; do not set future timestamps.
+                        # Match the installed v1.0 example and the physically
+                        # verified one-shot probe. Do not use a future schedule.
+                        req.header.stamp = self.node.get_clock().now().to_msg()
+                        req.play_timestamp = 0
                         self.last_motion = time.monotonic()
                         response = await self._call("motion", req)
                         status = "unknown" if response is None else (
                             "accepted" if response.response.header.code == 0 else "rejected")
-                results.append({"kind": "gesture", "name": gesture, "status": status})
+                receipt = {"kind": "gesture", "name": gesture, "status": status}
+                if status in {"accepted", "rejected"}:
+                    receipt.update(code=response.response.header.code,
+                                   task_id=response.response.task_id,
+                                   state=getattr(getattr(response.response, "state", None), "value", None))
+                results.append(receipt)
         return results
 
     def close(self):
