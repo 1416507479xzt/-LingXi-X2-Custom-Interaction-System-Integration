@@ -125,3 +125,12 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 随后操作者单次执行 timeout 10s ros2 service call /aimdk_5Fmsgs/srv/SetMcPresetMotion aimdk_msgs/srv/SetMcPresetMotion 请求：area.value2、motion.value1002、interrupt=false、play_timestamp0；请求头时间戳保持默认0。终端显示requester: making request后返回提示符，未出现response；用户观察机器人没有任何反应。未采集该命令退出码，不将其记为明确拒绝、受理或完成。测试尚未通过，不能仅凭服务在ROS图中存在就断定服务链路可用。
 
 目前不重复发送，不自动改运动模式、原生模块或SDK。下一步只读复核GetMcAction当前响应及运动/桥接服务节点，确认查询链路和动作服务提供方后再定位。表情与语音既有验收不变，肢体动作对话开关继续关闭。
+
+
+## 动作服务提供方核对
+
+只读node info确认 /ros2_bridge_node 只有参数服务，不提供目标运控RPC；/mc_ros2_node3606 同时提供GetMcAction、SetMcPresetMotion、GetMcPresetMotionState、GetMcMotions等服务。GetMcAction再次返回STAND_DEFAULT/status100；因此不是整个MC节点不可查询，但仍未证明动作RPC已被处理。没有重发动作、重启MC或改控制来源。
+
+后续优先比较二开SDK与机载运行服务的动作请求定义。当前PC2二开环境SetMcPresetMotion没有input_source；可访问的1.1官方变更记录说明该字段为新增预留字段。机载服务是否使用含该字段的定义尚未核实，只有版本差异假设，不能据此直接安装新版SDK或修改消息。应先只读定位 /agibot/software 中实际部署的 .srv/.idl，对比字段顺序。GetMcAction能通信不代表所有srv均匹配。
+
+官方1.1预设动作文档还明确，GetCurrentInputSource不能用来查询谁在控制预设动作；不能据此将修改输入源当作挥手修复的先决条件。此项引用仅用于排查边界，不把1.1的结构直接套到本机。参考[变更记录](https://x2-aimdk.agibot.com/zh-cn/latest/changelog.html)及[预设动作](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/preset_motion.html)。
