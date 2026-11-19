@@ -143,6 +143,63 @@ exit
 
 模式切换与恢复的历史实测证据见[11月8日联调记录](docs/zh-CN/2026-11-08-x2-real-robot-integration.md)和[复现指南](docs/zh-CN/reproduce-on-x2.md)。
 
+## 每次启动自研交互与查看食堂反馈
+
+以下使用已部署的真机项目。首次部署、配置机器人项目根目录的私有 `.env` 和更新离线包，先按[复现指南](docs/zh-CN/reproduce-on-x2.md)完成；不要把 Key 写入源码或提交到 Git。原生模式切换按上节操作，不需要每次重复切换已经确认生效的模式。
+
+### 1. 电脑 Windows PowerShell：连接机器人 PC2
+
+```powershell
+$RobotIp = Read-Host '输入机器人当前 Wi-Fi IP'
+ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "agi@${RobotIp}"
+```
+
+输入当前地址和 SSH 密码，确认进入机器人 Linux 提示符后，才能执行下面的 Bash 命令。若出现 `Connection reset` 并回到 `PS C:\...>`，先重新连接。
+
+### 2. 机器人 PC2 SSH：启动语音、表情和动作
+
+前提：旧自研 Agent 已停止，已按上节完成 `only_voice` 设置及原生 agent 重启、实际确认；机器人处于稳定站立且动作空间足够。下列命令会启用模型自主选择的表情和预设动作；程序不会自动切换原生模式或站立模式。
+
+```bash
+cd /home/agi/eldercare-x2/eldercare_x2
+source /home/agi/aimdk/install/local_setup.bash
+mkdir -p logs
+SESSION_ID=$(date +%Y%m%d_%H%M%S)
+export DOUBAO_ASR_HOTWORDS='["灵犀"]'
+export X2_ONLY_VOICE_CONFIRMED=1
+python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend aimdk --enable-robot-presentation --enable-robot-motion --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback.jsonl --log-file "logs/autonomy_${SESSION_ID}.log" --metrics-file "logs/autonomy_${SESSION_ID}_metrics.json"
+```
+
+Key由机器人项目 `.env` 自动读取，无需每次粘贴。保持此SSH窗口运行，说“你好灵犀”，等它询问后开始对话。日志保存在机器人项目 `logs/` 内；食堂反馈在复述后由用户明确确认，再写入 `data/dining_feedback.jsonl`。
+
+### 3. 电脑另开 Windows PowerShell：打开反馈表网页
+
+在电脑仓库根目录执行（不要在机器人SSH窗口执行）：
+
+```powershell
+.\open_dining_dashboard.cmd
+```
+
+若电脑仓库仍在本项目开发时的路径，可从任意 PowerShell 目录执行：
+
+```powershell
+& 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
+```
+
+在其他电脑上复现时使用实际克隆目录中的同名入口。按提示输入当前机器人 Wi-Fi IP，并在打开的SSH窗口输入密码；连通后自动打开浏览器，保留连接窗口。默认读取的反馈路径与上面的Agent启动参数一致。
+
+**网页只用于查看，不负责保存。** 不打开或关闭网页时，运行中的Agent仍可在用户明确确认后保存反馈；以后打开网页即可查看。Agent未运行时，不会通过本项目新增语音反馈记录。
+
+### 4. 停止自研交互
+
+在运行Agent的PC2 SSH窗口按 `Ctrl+C`，退出后执行：
+
+```bash
+unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS
+```
+
+这只清理当前终端的临时标志，不删除 `.env`、日志或已保存反馈；也不会自动恢复原生问答。需要恢复原生交互时，按上节设置 `normal` 并在PC3重启原生agent，再实际验证语音回答。
+
 ## 代码位置
 
 | 路径 | 作用 |
@@ -166,7 +223,7 @@ Windows 便携模拟器运行时，在仓库根目录安装 `requirements.txt`�
 
 `.gitignore` 排除了 `.env`、录音、历史反馈、缓存与生成的 ZIP。药品资料和提醒内容为项目配置，不能代替个人处方或真实预约记录。开源基础与改动说明见[开源引用说明](开源引用说明.md)及仓库提交历史。
 
-当前纯语音优化与十轮连续对话测试见[真机对话验收步骤](docs/zh-CN/voice-dialogue-acceptance.md)，包含日志和耗时记录方式；表情动作继续关闭。
+纯语音对照与十轮连续对话测试见[真机对话验收步骤](docs/zh-CN/voice-dialogue-acceptance.md)，包含日志和耗时记录方式；该对照流程关闭表情动作，日常完整联测使用上面的启动命令。
 
 环节四真机语音确认、独立反馈记录及电脑SSH隧道查看网页，见[社区食堂意见收集测试步骤](docs/zh-CN/stage4-dining-feedback.md)。
 
