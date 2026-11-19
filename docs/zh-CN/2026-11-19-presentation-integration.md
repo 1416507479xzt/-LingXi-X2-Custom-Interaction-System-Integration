@@ -76,3 +76,12 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 停止自研Agent后，用户再次直接请求emotion_id=120、mode=1、priority=1，返回success=True、message=成功，且屏幕实际显示表情；ROS图存在 /face_ui_proxy/status [aimdk_msgs/msg/FaceEmojiStatus]。证明关切素材/编号及单次服务调用可用，不证明对话时的间歇拒绝已解决。优先级冲突只是候选原因，尚无该次拒绝的message或同期状态证据；也可能存在其他显示资源条件。
 
 本轮仅补齐表现回执的emotion_id、mode、priority和外层message（限240字符）；无响应明确记unknown，不把超时等同拒绝。保持priority=1、不重试、不关闭系统显示模块，不修改对话、音频或肢体动作开关。相关34项聚焦回归通过；下一次先更新presentation.py，重复对话并查看完整服务message，再决定修复办法。
+
+
+## 拒绝原因已确认：当前播放优先级60
+
+10:31:19的neutral请求（id10、单次、priority1）成功；10:31:28的confused和10:31:39的sympathy均返回rejected，外层message明确说明“优先级低于当前播放，操作被忽略, extra: Current priority: 60, request priority: 1”。至此确认拒绝机制为显示优先级竞争，不再只是候选原因。
+
+仍未知priority60播放项的素材、发起模块、有效时段及是否含系统状态提示。不能把显示优先级60当作表情编号60，也不能推断它来自音频焦点优先级6；两者是不同接口的参数。下一步只读查看/face_ui_proxy/status的发布者、QoS及当前播放状态，必要时做对话期间对照，再选择协调办法。当前没有提高表情优先级、关闭task_manager/interaction_slave、修改原生SDK或启用肢体动作。
+
+当前可访问的[官方屏幕文档](https://x2-aimdk.agibot.com/zh-cn/latest/Interface/interactor/screen.html)标为1.1.0，说明低优先级请求会被忽略，并提醒高优先级覆盖可能遮挡系统提示；本机具体priority60来源必须依据1.0.0实测核对，不把新版文档中的系统优先级数值当作本机全量配置。
