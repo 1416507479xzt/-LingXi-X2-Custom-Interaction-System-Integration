@@ -36,7 +36,7 @@ EMOTION_MEANINGS = dict(zip(EMOJI_IDS, [
     "疑惑", "震惊，不夸大健康风险", "撒娇，谨慎使用", "严肃", "思考",
     "愤怒，不对长者发怒", "崇拜和赞赏，不等于同情"]))
 # Catalog inclusion is not a claim of physical validation on every firmware.
-PHYSICALLY_VERIFIED_MOTIONS = frozenset({"wave_hands"})
+PHYSICALLY_VERIFIED_MOTIONS = frozenset({"wave_hands", "heart_both"})
 MOTION_SOURCE = "https://x2-aimdk.agibot.com/zh-cn/v0.9.0/Interface/control_mod/preset_motion.html"
 MOTION_SOURCE_CURRENT = "https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/preset_motion.html"
 GESTURE_MEANINGS = dict(zip(MOTIONS, [
@@ -101,6 +101,13 @@ def unity_plan(emotion, gesture, text):
     if gesture:
         plan.append(("gesture", gesture, {}))
     return plan
+
+
+def _priority_rejected(response):
+    if response is None or response.success:
+        return False
+    message = str(getattr(response, "message", ""))
+    return "优先级低于当前播放" in message and "Current priority:" in message
 
 
 class AimdkPresentation:
@@ -189,6 +196,7 @@ class AimdkPresentation:
         if emotion not in (None, *EMOJI_IDS) or gesture not in (None, *MOTIONS):
             raise ValueError("Unsupported presentation")
         results = []
+        pending_emoji = None
         async with self.lock:
             if emotion and allowed():
                 req = self.types["emoji"].Request()
@@ -200,9 +208,7 @@ class AimdkPresentation:
                 # Only an explicit priority rejection proves no display write
                 # was accepted. A timeout or other rejection is never retried.
                 message = str(getattr(response, "message", "")) if response is not None else ""
-                if (gesture is None and response is not None and not response.success
-                        and "优先级低于当前播放" in message
-                        and "Current priority:" in message):
+                if gesture is None and _priority_rejected(response):
                     first_message = message[:240]
                     wait_start = time.monotonic()
                     clear = await self._wait_display_clear(allowed, since=wait_start)
@@ -226,6 +232,10 @@ class AimdkPresentation:
                 else:
                     receipt["reason"] = "service_unavailable_or_response_timeout"
                 results.append(receipt)
+                if gesture is not None and _priority_rejected(response):
+                    # Send/check the body plan before waiting for a display slot.
+                    # Keep this exact emotion request; never repeat the motion.
+                    pending_emoji = (req, receipt, time.monotonic(), message[:240])
             if gesture:
                 if not self.enable_motion:
                     results.append({"kind": "gesture", "name": gesture,
@@ -256,6 +266,26 @@ class AimdkPresentation:
                                    task_id=response.response.task_id,
                                    state=getattr(getattr(response.response, "state", None), "value", None))
                 results.append(receipt)
+            if pending_emoji is not None:
+                emoji_req, emoji_receipt, since, original_message = pending_emoji
+                remaining = 6 - (time.monotonic() - since)
+                clear = False
+                if remaining > 0 and allowed():
+                    clear = await self._wait_display_clear(allowed, since=since, timeout=remaining)
+                emoji_receipt.update(deferred=True, initial_message=original_message,
+                    wait_ms=round((time.monotonic() - since) * 1000),
+                    coordination_phase="after_motion")
+                if clear and allowed():
+                    response = await self._call("emoji", emoji_req)
+                    emoji_receipt.update(attempts=2, status="unknown" if response is None else
+                                         ("accepted" if response.success else "rejected"))
+                    if response is not None:
+                        emoji_receipt["message"] = str(getattr(response, "message", ""))[:240]
+                    else:
+                        emoji_receipt.pop("message", None)
+                        emoji_receipt["reason"] = "service_unavailable_or_response_timeout"
+                elif remaining <= 0:
+                    emoji_receipt["reason"] = "display_deadline_elapsed_after_motion"
         return results
 
     def close(self):

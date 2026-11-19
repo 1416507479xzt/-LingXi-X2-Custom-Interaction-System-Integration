@@ -44,6 +44,7 @@ class DocumentedMotionTests(unittest.IsolatedAsyncioTestCase):
         catalog = capabilities(backend='aimdk',enable_motion=True)
         self.assertEqual(set(catalog['gestures']),set(MOTIONS))
         self.assertEqual(catalog['motion_validation']['wave_hands'],'physically_verified')
+        self.assertEqual(catalog['motion_validation']['heart_both'],'physically_verified')
         self.assertEqual(catalog['motion_validation']['shake_right'],'documented_not_physically_verified')
         self.assertEqual(capabilities(backend='aimdk')['gestures'],[])
         self.assertEqual(capabilities(False,'aimdk',enable_motion=True)['gestures'],[])

@@ -136,6 +136,78 @@ class ExpressionOnlyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(results[0]['attempts'], 2)
         self.assertEqual([c.args[0] for c in backend._call.call_args_list], ['emoji','emoji'])
 
+    def mixed_backend(self):
+        backend = self.deferred_backend()
+        backend.enable_motion = True
+        backend.last_motion = float('-inf')
+        backend.node = NS(get_clock=lambda: NS(now=lambda: NS(to_msg=lambda: 'now')))
+        backend.types.update({k: NS(Request=lambda: NS(header=NS(stamp=None),
+            request=NS(header=NS(stamp=None)), motion=NS(value=0), area=NS(value=0)))
+            for k in ('mode','motion')})
+        return backend
+
+    async def test_combined_plan_retries_only_expression_after_motion(self):
+        backend = self.mixed_backend()
+        backend._call = AsyncMock(side_effect=[
+            NS(success=False, message='优先级低于当前播放, Current priority: 60'),
+            NS(header=NS(code=0),info=NS(action_desc='STAND_DEFAULT',status=NS(value=100))),
+            NS(response=NS(header=NS(code=0),state=NS(value=400),task_id=0)),
+            NS(success=True,message='成功')])
+        async def clear(*args,**kwargs):
+            self.assertEqual([c.args[0] for c in backend._call.call_args_list],['emoji','mode','motion'])
+            return True
+        backend._wait_display_clear = AsyncMock(side_effect=clear)
+        results = await backend.dispatch('happy','heart_both',lambda:True)
+        self.assertEqual([c.args[0] for c in backend._call.call_args_list],['emoji','mode','motion','emoji'])
+        self.assertEqual(results[0]['status'],'accepted')
+        self.assertEqual(results[0]['attempts'],2)
+        self.assertEqual(results[0]['coordination_phase'],'after_motion')
+        self.assertEqual(results[1]['status'],'accepted')
+        self.assertEqual(backend._call.call_args_list[-1].args[1].priority,1)
+
+    async def test_combined_unknown_expression_is_not_retried(self):
+        backend = self.mixed_backend()
+        backend._call = AsyncMock(side_effect=[None,
+            NS(header=NS(code=0),info=NS(action_desc='STAND_DEFAULT',status=NS(value=100))),
+            NS(response=NS(header=NS(code=0),state=NS(value=400),task_id=0))])
+        backend._wait_display_clear = AsyncMock()
+        results = await backend.dispatch('happy','wave_hands',lambda:True)
+        self.assertEqual(results[0]['status'],'unknown')
+        self.assertEqual([c.args[0] for c in backend._call.call_args_list],['emoji','mode','motion'])
+        backend._wait_display_clear.assert_not_awaited()
+
+    async def test_slow_motion_reply_does_not_add_six_more_seconds_of_stale_expression_wait(self):
+        backend = self.mixed_backend()
+        now=[0.0]
+        async def call(kind,request):
+            if kind=='emoji':
+                return NS(success=False,message='优先级低于当前播放, Current priority: 60')
+            if kind=='mode':
+                return NS(header=NS(code=0),info=NS(action_desc='STAND_DEFAULT',status=NS(value=100)))
+            now[0]=9.0
+            return None
+        backend._call=AsyncMock(side_effect=call)
+        backend._wait_display_clear=AsyncMock()
+        with patch('x2_agent.presentation.time.monotonic',side_effect=lambda:now[0]):
+            results=await backend.dispatch('happy','wave_hands',lambda:True)
+        self.assertEqual(results[0]['reason'],'display_deadline_elapsed_after_motion')
+        self.assertEqual(results[1]['status'],'unknown')
+        self.assertEqual([c.args[0] for c in backend._call.call_args_list],['emoji','mode','motion'])
+        backend._wait_display_clear.assert_not_awaited()
+
+    async def test_second_combined_expression_rejection_does_not_loop(self):
+        backend = self.mixed_backend()
+        reject=NS(success=False,message='优先级低于当前播放, Current priority: 60')
+        backend._call=AsyncMock(side_effect=[reject,
+            NS(header=NS(code=0),info=NS(action_desc='STAND_DEFAULT',status=NS(value=100))),
+            NS(response=NS(header=NS(code=0),state=NS(value=400),task_id=0)),reject])
+        backend._wait_display_clear=AsyncMock(return_value=True)
+        results=await backend.dispatch('happy','heart_both',lambda:True)
+        self.assertEqual(results[0]['status'],'rejected')
+        self.assertEqual(results[0]['attempts'],2)
+        self.assertEqual(sum(c.args[0]=='motion' for c in backend._call.call_args_list),1)
+        self.assertEqual(sum(c.args[0]=='emoji' for c in backend._call.call_args_list),2)
+
     async def test_arbitrary_nonpreset_motion_is_rejected_before_any_rpc(self):
         backend = self.deferred_backend()
         backend.enable_motion = True
