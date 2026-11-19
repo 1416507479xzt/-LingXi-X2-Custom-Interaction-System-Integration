@@ -170,3 +170,16 @@ SDK仍是/home/agi/aimdk/install的v1.0.0-ga424add；SetMcPresetMotion请求不�
 诊断找到实际官方例程 /home/agi/aimdk/src/py_examples/py_examples/preset_motion_client.py；后续只读其源码，核对机载版本的构造、时间戳和调用方式，不直接运行含写请求/重试的例程。
 
 检查诊断实现时还发现GetSystemState使用header/CommonRequest布局，原脚本只给request/CommonRequest布局填当前时间；本地已兼容这两种只读请求头并补测试。该遗漏不证明超时根因，修正后仍未取得真机系统状态。收窄例程路径查找，避免将生成的消息Python文件误标作例程。五项诊断离线测试通过；目前无需为了该修正再次上传/运行诊断，优先读取现有官方例程。
+
+
+## 机载官方预设动作例程核对与单次探针
+
+用户只读提供/home/agi/aimdk/src/py_examples/py_examples/preset_motion_client.py完整源码。它使用当前已导入的SetMcPresetMotion、RequestHeader、McPresetMotion及McControlArea，area/motion赋value、interrupt=False，发送前将header.stamp设为node当前时间。例程对跨板通信使用最多8次、每次0.25秒等待的发送循环。这说明安装例程没有额外input_source字段；不能因此推断远端服务schema必然相同，也没有证据支持立即替换SDK。
+
+此前手工CLI请求header.stamp为0，和机载例程的当前时间戳不同；这只是可验证差异，尚未证实是无响应原因。当前不直接运行含多次写重试的官方例程。
+
+新增scripts/aimdk_motion_probe.py：默认只查询模式；显式--execute才允许右手挥手（area2/motion1002）一次。沿用一个PC2节点，先查询GetMcAction，要求header.code0、STAND_DEFAULT/status100，动作服务发现后才构造当前时间戳请求；interrupt=False、play_timestamp0，等待响应最多8秒且不重发。保留code/task_id/state的响应数据，不把服务受理当作动作完成。无响应、失去明确模式或非稳定站立时不继续动作；不进入PC1、不切换模式、不修改SDK。
+
+四项探针离线测试通过，连同五项只读诊断测试共九项：默认不创建写客户端、零力矩/切换中阻止、单次当前时间戳及任务响应保留、超时清理且不重发。真实挥手仍待用户执行单次探针并观察，现有生产语音/表情和动作开关不变。
+
+部署只需将scripts/aimdk_motion_probe.py复制到PC2项目scripts目录。先加载原SDK，默认运行脚本不加参数可只读核对；现场确认站稳、手臂空间和急停操作条件后，才单次运行 python3 scripts/aimdk_motion_probe.py --execute。若未知结果，先观察并回传JSON，不重复执行。
