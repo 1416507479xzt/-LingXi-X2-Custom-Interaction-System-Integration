@@ -217,3 +217,12 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 用户部署并预检后启动带--enable-robot-motion的主Agent：11:16:58同一表现计划中，neutral(id10/priority1)一次accepted，同时wave_hands返回accepted、code0、task_id0、state400。11:17:17的下一条纯表情neutral计划先因priority60拒绝，等待915ms后以priority1第二次请求accepted。
 
 这些回执证明主Agent已实际发出并收到右挥手的服务受理、开启肢体动作后纯表情协调仍有成功样本；915ms仅为表情协调等待，不是端到端语音延迟。state400仍不等于动作完成。本次已向用户核对实际挥手收回、站立、语音与表情，尚待现场观察回复；未将服务accepted直接标成完整联动验收通过。
+
+
+## 本轮现场补充：动作与语音正常，表情选择neutral
+
+用户回复“动作和语音都正常但是我没看见表情，我不知道agent没下发还是下发失败了”。据此，主Agent右挥手及语音的现场效果得到确认；本轮表情实际可见效果仍不确定。
+
+回看两条回执，情绪均为neutral(id10)，且最终accepted，没有happy或sympathy。neutral对应平静表情，本就可能接近默认外观；不能把没看到明显变化记成没有发送，也不能把accepted当作持续可见且未被原生显示覆盖。没有证据要求再提高优先级、改SDK或关闭原生模块。
+
+下一步使用明确且可见的开心表情请求核对模型选择、最终回执和屏幕效果，动作开关可在本次纯表情对照中关闭，避免新增挥手干扰。此处不改成每轮强制表情，不因neutral正常选择而自动判错。
