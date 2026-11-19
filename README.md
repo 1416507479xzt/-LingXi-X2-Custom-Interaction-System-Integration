@@ -1,8 +1,272 @@
-# 灵犀 X2 自研语音交互 Agent
+# 灵犀 X2 自研交互 Agent
 
-本项目将长者陪护对话接入灵犀 X2 真机：AimDK 提供麦克风、扬声器、表情和预设动作接口；豆包语音服务完成 ASR/TTS；火山方舟上的 Doubao-Seed 模型负责语义理解、回答和受约束的表现选择。迎宾健康问询、生活协助与社区食堂意见共用一套会话逻辑。Unity 仿真用于回归对照，真机通过独立传输适配层运行同一套业务代码。
+将仿真中的长者陪护交互迁移到灵犀 X2 真机：AimDK 接入麦克风、扬声器、屏幕表情和预设动作；豆包语音负责 ASR/TTS，`doubao-seed-2-0-mini-260428` 负责回答、上下文及表情/动作选择。食堂意见经用户确认后保存，可在电脑网页查看。
 
-当前版本：**[v0.3.0（第三版）](docs/zh-CN/releases/v0.3.0.md)**。源码版本见 VERSION；与第二版的变化见[版本对比](https://github.com/1416507479xzt/-X2-/compare/v0.2.0...v0.3.0)。
+**现在从哪里开始：**已部署的机器人从[日常启动](#每次启动自研交互与查看食堂反馈)开始；新电脑或首次部署先完成[首次部署](#首次部署与更新离线包)。只想恢复机器人自带问答，直接看[恢复原生交互](#恢复原生交互)。
+
+源码主线为 `main`；[v0.3.0第三版标签](docs/zh-CN/releases/v0.3.0.md)保留此前纯语音基线，当前语音、表情、动作联动包含后续main提交，不能用第三版标签代替当前完整效果。版本变化见[CHANGELOG](CHANGELOG.md)和[版本管理](docs/zh-CN/version-management.md)。
+
+## 导航
+
+- [当前验证状态](#当前验证状态)
+- [执行窗口与设备](#执行窗口与设备)
+- [首次部署与更新离线包](#首次部署与更新离线包)
+- [每次启动自研交互与查看食堂反馈](#每次启动自研交互与查看食堂反馈)
+- [恢复原生交互](#恢复原生交互)
+- [常见问题](#常见问题)
+- [演示视频](#演示视频)
+- [代码与开发文档](#代码与开发文档)
+
+## 当前验证状态
+
+2026-11-19，用户部署回答与动作频率修正版后确认：**“所有效果（语音、表情、动作）都可以了。”** 食堂反馈保存和网页更新也已独立确认。对应实现提交 `a6d88e5`，验收归档 `a6e13fc`；[详细证据](docs/zh-CN/2026-11-19-dialogue-and-gesture-followup.md)。
+
+| 项目 | 已确认范围 |
+|---|---|
+| 真机环境 | 手头X2 Ultra，AimDK `v1.0.0-ga424add`，Linux aarch64、Python 3.10.12；`only_voice`模式 |
+| 语音与对话 | PCM→ASR→Mini→TTS→扬声器跑通，音频焦点申请及释放、连续问答已测 |
+| 表情与动作 | 开心/关切表情、右挥手、双手比心曾逐项确认；最新联测用户确认整体效果正常 |
+| 自主表现 | 模型同轮选择回答、20种交互表情及29项官方动作/区域组合或null；动作最小间隔8秒，执行前检查稳定站立 |
+| 食堂反馈 | 描述→复述→明确确认→JSONL保存→网页查看闭环已测 |
+| 本地验证 | 最近相关离线回归229项通过，10轮真实Mini合成文本对照归档 |
+
+尚未逐项验证的27个动作、长时间运行、不同网络/噪声、赛方统一机器人的兼容性及容器真机运行，不能由本轮反馈推定通过。没有新的完整延迟统计，不声称稳定低于2秒。到点主动提醒已排除在开发范围外。
+
+## 执行窗口与设备
+
+| 位置 | 用来做什么 | 如何识别 |
+|---|---|---|
+| 电脑Windows PowerShell | Git、构建/上传离线包、SSH连接、打开反馈网页 | 提示符以 `PS C:\...>` 开头 |
+| 机器人PC2 SSH | 加载AimDK、切换模式、预检、运行自研Agent | 手头机器登录横幅显示SoC1；项目在 `/home/agi/eldercare-x2/eldercare_x2` |
+| PC3机内SSH | 重启原生交互agent | 从PC2再SSH进入；手头机器横幅显示SoC2 |
+
+**二开程序在PC2运行，不进入PC1开发，也不修改或重启PC1运控。** PC2与PC3都可能显示 `agi@agi`，只看提示符无法区分。SSH的 `exit` 每次只返回上一层。
+
+Wi-Fi IP每次从机器人信息页核对。视频中的旧地址仅为当时现场地址，不写成日常固定值。`10.0.1.42`是这台机器人已核对的PC3机内地址；其他机器需要重新核对内部拓扑，不能用它替代Wi-Fi地址。
+
+## 首次部署与更新离线包
+
+录屏开始时项目、依赖和私有配置已经部署，**视频没有演示这一节**。这里补齐新电脑复现所需步骤；同一版本日常使用无需重新打包、上传或解压。
+
+### A. 电脑PowerShell：取得当前源码并构建
+
+安装Git及Python 3.10或更新版本，在PowerShell执行：
+
+```powershell
+git clone https://github.com/1416507479xzt/-X2-.git
+Set-Location .\-X2-
+python scripts/build_robot_bundle.py --download-wheels
+python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
+```
+
+现有仓库在确认本地修改已保存后更新main，再构建即可。构建在电脑上下载锁定的Linux aarch64/Python3.10依赖，机器人无需pip安装；运行云端ASR/LLM/TTS仍需要网络。容器是候选方案，当前实机流程使用ZIP，见[容器说明](docs/zh-CN/docker-reproduction.md)。
+
+### B. 电脑PowerShell：上传并连接PC2
+
+在电脑仓库根目录执行，每行执行完再进行下一行：
+
+```powershell
+$RobotIp = (Read-Host '输入机器人当前 Wi-Fi IP').Trim()
+if ([string]::IsNullOrWhiteSpace($RobotIp)) { throw '机器人 IP 不能为空' }
+ssh "agi@${RobotIp}" 'mkdir -p /home/agi/eldercare-x2'
+scp -O .\dist\eldercare_x2_aarch64_py310.zip "agi@${RobotIp}:/home/agi/eldercare-x2/"
+ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "agi@${RobotIp}"
+```
+
+输入SSH密码时不显示字符是正常的。`scp`完成后仍是Windows窗口；`ssh`登录成功后才进入机器人。
+
+### C. 机器人PC2 SSH：停止旧Agent、解压与预检
+
+如果旧Agent在另一个SSH窗口运行，先在那里按 `Ctrl+C`，不要在它运行时覆盖源码。然后执行：
+
+```bash
+cd /home/agi/eldercare-x2
+python3 -m zipfile -e eldercare_x2_aarch64_py310.zip .
+cd eldercare_x2
+source /home/agi/aimdk/install/local_setup.bash
+python3 scripts/robot_preflight.py
+```
+
+预检通过表示依赖、版本和音频字段符合预期，不表示已测试声音、网络或动作。出现不兼容先记录错误，不修改原生SDK。
+
+### D. 首次配置两把Key（只做一次）
+
+在电脑仓库根目录复制 `.env.example` 为 `.env`，填写自己的 `DOUBAO_SPEECH_API_KEY` 和 `ARK_API_KEY`。两把Key用途不同；已有 `.env` 时不要重新复制模板覆盖它。电脑PowerShell上传：
+
+```powershell
+scp -O .\.env "agi@${RobotIp}:/home/agi/eldercare-x2/eldercare_x2/.env"
+```
+
+机器人PC2 SSH设置文件权限：
+
+```bash
+chmod 600 /home/agi/eldercare-x2/eldercare_x2/.env
+```
+
+Key由Agent自动读取，后续不用反复粘贴。现有环境变量优先于文件；不要把 `X2_ONLY_VOICE_CONFIRMED` 写进 `.env`。配置、Key、录音及真实反馈不提交Git或放进离线包。更多逐层探针见[完整部署指南](docs/zh-CN/reproduce-on-x2.md)。
+
+## 每次启动自研交互与查看食堂反馈
+
+以下按 **《浙江数智大赛电脑屏幕.mp4》约4分45秒录屏**整理。视频证据定位见[时间轴与异常记录](docs/zh-CN/2026-11-19-screen-recording-walkthrough.md)。命令结合当前源码核对，动态地址与日志编号由运行时生成，不照抄视频旧值。
+
+### 1. 电脑PowerShell：SSH登录PC2（视频00:00–00:20）
+
+```powershell
+$RobotIp = (Read-Host '输入机器人当前 Wi-Fi IP').Trim()
+if ([string]::IsNullOrWhiteSpace($RobotIp)) { throw '机器人 IP 不能为空' }
+ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "agi@${RobotIp}"
+```
+
+已经在PC2 SSH窗口时跳过。若掉线回到 `PS C:\...>`，先重新连接，不继续输入Linux命令。
+
+<a id="原生交互模块切换重启与恢复"></a>
+
+### 2. PC2 SSH：切换only_voice（视频约00:20–00:35）
+
+先停止旧自研Agent和诊断脚本。若本次已经完成模式设置、原生agent重启和实际行为确认，可直接跳到第5步。新开机或状态不确定时重新核对。
+
+```bash
+source /home/agi/aimdk/install/local_setup.bash
+ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/SetAgentPropertiesRequest "{contents: {properties: [{key: {value: 2}, value: 'only_voice'}]}}"
+```
+
+等服务返回 `response` 再继续。手头机器可返回 `code=0/status.value=0 (UNKNOWN)`，不能单凭此响应宣称切换成功。`only_voice`用于保留自研接入需要的原生语音链路，暂停原生大模型问答；不是把整个原生agent永远关掉。
+
+### 3. PC2进入PC3，逐条重启原生agent（视频约00:35–01:10）
+
+本机已核对的PC3地址：
+
+```bash
+ssh agi@10.0.1.42
+```
+
+输入密码并核对SoC2横幅后，在PC3执行：
+
+```bash
+aima em stop-app agent
+```
+
+等停止成功，再执行：
+
+```bash
+aima em start-app agent
+```
+
+确认启动成功，再执行：
+
+```bash
+exit
+```
+
+返回PC2。不要把两条aima命令当成PC2命令；不要用 `stop-all` 或修改运控模块。
+
+**视频中的异常要与标准流程区分：**约01:00，启动命令实际返回 `500 Server Error` 和 `Process "agent" already running`。视频随后退出并运行了自研Agent，但没有展示该异常的处理和原生模式行为核对；不能将其记为重启成功。遇到此类错误先保留输出，核查PC3应用状态，例如只读执行 `aima em get-app agent`，结合现场行为判断；不盲目重复重启、不杀进程。此前成功的模式恢复记录见[11月8日联调](docs/zh-CN/2026-11-08-x2-real-robot-integration.md)。
+
+### 4. PC2：确认实际模式（补充验收步骤）
+
+先不启动自研Agent，用原生唤醒词问“现在几点”，确认原生大模型不再回答，并结合原生agent启动结果和已验证的收音链路核对。仅仅没有声音不能证明模式成功。此检查没有在本段录屏中单独展示。
+
+需要动作时由操作者通过原生控制方式让机器人稳定站立，并留出动作空间。程序不会自动从零力矩切换成站立。
+
+### 5. PC2 SSH：启动自研语音、表情和动作（视频约01:10–01:30）
+
+```bash
+cd /home/agi/eldercare-x2/eldercare_x2
+source /home/agi/aimdk/install/local_setup.bash
+mkdir -p logs
+SESSION_ID=$(date +%Y%m%d_%H%M%S)
+export DOUBAO_ASR_HOTWORDS='["灵犀"]'
+export X2_ONLY_VOICE_CONFIRMED=1
+python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend aimdk --enable-robot-presentation --enable-robot-motion --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback.jsonl --log-file "logs/autonomy_${SESSION_ID}.log" --metrics-file "logs/autonomy_${SESSION_ID}_metrics.json"
+```
+
+保持这个窗口运行，等预检通过并显示等待唤醒/会话就绪，再说“你好灵犀”，等它询问状态后回答。录屏约01:30–04:20显示ASR、模型回答、TTS及表现服务日志；声音和物理动作是否完成仍需现场观察。
+
+| 参数/命令 | 用途 |
+|---|---|
+| `source ...local_setup.bash` | 为当前SSH会话加载AimDK；新开会话要重新加载 |
+| `X2_ONLY_VOICE_CONFIRMED=1` | 人工确认标志；不会替你切模式 |
+| `--presentation-backend aimdk`与两个enable开关 | 启用真机表情及动作；模型从目录选一项或null |
+| `--vad-idle-seconds 1.5` | 收音停止但缺END时的有界片段收尾 |
+| `--aimdk-streaming-asr` | 收音期间开始连接和上传ASR |
+| `--dining-feedback-records` | 反馈保存位置，与下面网页入口一致 |
+| `mkdir -p logs`、`SESSION_ID`、两个日志参数 | 目录已存在时复用，每次运行生成独立日志与耗时文件 |
+
+日志落在机器人项目 `logs/` 内，不是录音文件。开发测试建议保留；若只需日常演示，可从启动命令删去 `--log-file`、`--metrics-file`及各自紧随的路径，终端仍显示信息，食堂保存不受影响。
+
+### 6. 电脑另开PowerShell：打开食堂反馈表（视频约04:20–04:45）
+
+不要关闭运行Agent的SSH窗口，也不要在机器人终端输入Windows路径。电脑仓库根目录执行：
+
+```powershell
+.\open_dining_dashboard.cmd
+```
+
+视频使用的是从任意PowerShell目录调用本机完整路径的方式：
+
+```powershell
+& 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
+```
+
+其他电脑使用实际克隆目录。按提示输入当前Wi-Fi IP，并在新SSH窗口自行输入密码，连通后浏览器自动打开。默认从本地18765–18775中选择可用端口，视频页面为 `http://127.0.0.1:18765/`；以脚本实际打印的地址为准，保留网页SSH连接窗口。
+
+**网页只负责查看，Agent负责保存。** 对机器人说食堂意见，等复述后明确确认，Agent才写入机器人上的 `data/dining_feedback.jsonl`。不开网页、关闭网页都不影响运行中的Agent保存；以后打开网页可查看历史记录。网页的 `new` 是记录状态，不代表已实际提交给食堂工作人员。
+
+### 7. 测试与停止（停止步骤为补充，视频未展示）
+
+观察语音是否完整、表情是否可见、动作是否完整收回且站立稳定。可依次测试“今天感觉不错”“今天有什么注意事项”，以及挥手、间隔至少8秒后双手比心；再完成一条食堂反馈确认并核对网页。
+
+结束时在Agent窗口按 `Ctrl+C`，退出后执行：
+
+```bash
+unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS
+```
+
+它只清理当前终端的临时标志，不删除 `.env`、日志和反馈，也不恢复原生问答。关闭反馈网页的SSH窗口只结束查看服务；恢复原生问答按下一节执行。
+
+## 恢复原生交互
+
+先在自研Agent窗口按 `Ctrl+C`，确认停止。PC2 SSH执行：
+
+```bash
+source /home/agi/aimdk/install/local_setup.bash
+ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/SetAgentPropertiesRequest "{contents: {properties: [{key: {value: 2}, value: 'normal'}]}}"
+```
+
+等返回响应，仍在PC2执行：
+
+```bash
+ssh agi@10.0.1.42
+```
+
+进入已核对的PC3后，逐条执行、每步确认成功再继续：
+
+```bash
+aima em stop-app agent
+```
+
+```bash
+aima em start-app agent
+```
+
+```bash
+exit
+```
+
+返回PC2后，不运行自研Agent，说原生唤醒词并问“现在几点”，实际听到原生回答才算恢复。停止脚本、清理变量或退出SSH都不会自动恢复normal。出现报错先停在该步骤排查，不将服务请求返回等同于模式生效。
+
+## 常见问题
+
+| 现象 | 先检查什么 |
+|---|---|
+| Windows提示source、python3或Linux路径不存在 | SSH是否断开了？先重新登录PC2 |
+| Python找不到 `/home/agi/scripts/...` | 是否漏了 `cd /home/agi/eldercare-x2/eldercare_x2` |
+| `The passed service type is invalid` | 在PC2重新source AimDK，再核对接口 |
+| aima列表里没有agent | 是否在PC2执行？手头机器原生agent在PC3 |
+| `already running / 500` | 保留输出并核查PC3实际应用状态；不视为成功，不盲目重启或杀进程 |
+| 没表情或动作 | 是否开启对应参数？检查表现回执、冷却、控制权、站立；accepted不等于已完成 |
+| 网页打不开 | 是否在电脑运行入口、完成密码输入并保留SSH窗口？使用脚本打印的本地URL |
+| 网页没有新记录 | Agent是否运行、意见是否明确确认、Agent与网页是否读取同一JSONL路径 |
 
 ## 演示视频
 
@@ -15,227 +279,20 @@
 
 电脑录屏为适合仓库分发的H.264压缩副本，保留原分辨率、完整时长和声音；实机视频保留原文件。开发电脑上的两份原视频没有修改。视频仅用于项目展示，不包含在机器人运行所需的离线部署包中。
 
-## 从另一台电脑开始
 
-版本节点、比较和旧版复测见[版本管理说明](docs/zh-CN/version-management.md)及[CHANGELOG](CHANGELOG.md)。ARM64 Docker候选镜像已通过云端构建、依赖检查及56项离线测试；下载和验证范围见[首次容器构建记录](docs/zh-CN/2026-11-18-container-build.md)及[容器复现说明](docs/zh-CN/docker-reproduction.md)。尚未完成容器真机验收，当前真机ZIP方案继续保留。
+## 代码与开发文档
 
-完整的克隆、离线包构建、SSH 复制、真机预检、逐层联调和原生交互恢复步骤见 **[从新电脑复现 X2 自研语音 Agent](docs/zh-CN/reproduce-on-x2.md)**。核心命令在 Windows PowerShell 的仓库根目录执行：
-
-```powershell
-git clone https://github.com/1416507479xzt/-X2-.git
-Set-Location .\-X2-
-git checkout --detach v0.3.0
-python scripts/build_robot_bundle.py --download-wheels
-python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
-```
-
-构建需要开发电脑联网下载锁定版本的 Linux aarch64 / CPython 3.10 Python 依赖。生成的 ZIP 位于 `dist/`，不会提交到 Git。真机运行云端 ASR、LLM、TTS 仍需要联网；API Key 在机器人运行时单独提供，不在源码仓库或部署包中。
-
-**开发位置：本项目二开程序在 PC2 开发和运行，PC1 不作为二开环境；不要求为本项目登录 PC1 或修改、停止其运控模块。** PC3 仅按下文已验证流程重启原生交互 agent。
-
-机器人 Wi-Fi IP 会随网络变化。部署时从机器人信息页面确认当前 IP，并在 PowerShell 中输入；源码和启动配置不预设历史 IP。
-
-## 当前验证状态
-
-最新真机复测：2026-11-19用户部署本轮修改后确认“所有效果（语音、表情、动作）都可以了”。正向状态回答、日常安排话题切换及动作频率已调整；229项相关离线回归通过，10轮Mini合成文本结果已归档。动作上下层间隔统一为8秒，代替上层45秒限制。食堂反馈此前已确认网页记录成功。本次为用户体验确认，未提供逐项动作清单或新耗时日志，不扩大为全部29项动作或延迟指标验收。见[本轮问题与验证边界](docs/zh-CN/2026-11-19-dialogue-and-gesture-followup.md)。
-
-截至2026-11-19，项目已从早期音频探针推进到完整自研 Agent 的真机语音交互、食堂反馈闭环及初步表情/右手挥手联动。当前使用 `doubao-seed-2-0-mini-260428`，在手头一台 AimDK v1.0.0（`ga424add`）的 X2 上，以 `only_voice` 模式运行；表情和动作通过独立参数开启；不带动作开关时保持关闭。
-
-| 内容 | 当前证据与状态 |
+| 主题 | 入口 |
 |---|---|
-| 真机语音链路 | 麦克风 VAD PCM → 豆包 ASR → Mini 对话 → 豆包 TTS → 机器人扬声器已跑通；优先级6的音频焦点申请、完整播报和释放已实测。 |
-| 唤醒与对话 | 已完成首次招呼后询问状态、后续问答及健康/生活协助的真机测试；用户确认回答完整，后续反馈本轮效果非常不错。首次招呼流程和上下文逻辑已有回归覆盖。 |
-| 延迟与播音优化 | 已接入收音期间上传 ASR、LLM 连接保温及有界 PCM 提前发送；用户在最新版部署后确认体验良好。历史首包耗时留在联调记录中，不作为当前版本指标；本轮没有新的完整耗时日志，尚不能宣称稳定低于2秒。 |
-| 食堂反馈闭环 | 语音描述 → 整理反馈 → 用户明确确认 → JSONL 保存 → 电脑网页查看已获用户真机确认，反馈表可实时更新。常用 Agent 命令和网页入口统一读取 `data/dining_feedback.jsonl`，保存路径参数遗漏问题已修复。 |
-| 本地回归 | 最近一次相关离线回归共224项通过，覆盖播放时序、焦点释放、确认条件及 CLI 配置到反馈保存路径等；离线测试与用户真机反馈分别记录。 |
-| 部署与复现 | 当前真机使用独立 ZIP 离线依赖包，依赖和 ROS 字段预检已通过；Windows 网页入口使用当前动态 IP 建立 SSH 隧道。API Key 与实际反馈数据不随仓库或部署包分发。 |
-
-最新修正、测试范围和用户真机复测结果见[播音与食堂反馈闭环记录](docs/zh-CN/2026-11-18-playback-and-feedback-path.md)、[版本记录](CHANGELOG.md)。本轮基线实现提交为 `bbaf7a1`，用户验收记录提交为 `5a9bc0b`。后续同学应结合[复现指南](docs/zh-CN/reproduce-on-x2.md)和[食堂反馈步骤](docs/zh-CN/stage4-dining-feedback.md)复测。
-
-**尚未验证的范围：**长时间运行及不同噪声/网络条件下的稳定性、其余27个预设动作的实机支持及复杂联动、比赛方统一机器人的版本兼容性、Docker 容器在真机上的运行。AimDK v1.1.0 音频参数只有静态适配，尚无实机验证。到点主动提醒已按开发范围排除，不列入待开发功能。
-
-项目的目标是**业务对话代码不因仿真或真机而改动**；设备接口、固件、网络和运行环境仍需用实际机器人验证。未知 AimDK 版本或不兼容字段会在预检中停止。
-
-早期排查过程保留在[ASR 完整性记录](docs/zh-CN/2026-11-18-x2-asr-diagnosis.md)、[回答与延迟优化记录](docs/zh-CN/2026-11-18-dialogue-latency-optimization.md)及[2026-11-08 联调记录](docs/zh-CN/2026-11-08-x2-real-robot-integration.md)，用于追溯问题与比较版本，不代表当前只完成了两轮问答。
-
-## 自主回答、表情与官方预设动作
-
-2026-11-19按用户要求，main已开放官方预设动作表的全部29个动作/区域组合，保留20种交互表情。Mini在同一轮中自主生成回答、选择表情和一个动作或null，不额外增加动作规划调用。开启动作仍需要独立 --enable-robot-motion，发送前检查稳定站立、冷却及控制权，不打断、不重发未知结果，不进入PC1。
-
-224项相关离线测试通过；10个真实Mini合成文本测试均有效，7个明确动作/拒绝指令全部匹配。已实际确认的范围是语音、关切/开心表情、右手挥手及双手比心；其余27个动作已接入目录但尚未逐项实机验收。完整目录、来源、原始文本结果、操作和验证边界见[自主多模态接入说明](docs/zh-CN/autonomous-presentation.md)，历史过程见[联调记录](docs/zh-CN/2026-11-19-presentation-integration.md)。第三版标签保留原始语音基线，不移动。
-
-## 原生交互模块：切换、重启与恢复
-
-以下是手头 X2 Ultra / AimDK v1.0.0 已验证过的操作流程。**PC2 负责调用模式设置服务，PC3 负责重启原生 agent。** 两台机器的提示符都可能是 `agi@agi`，不能只靠提示符区分：登录横幅中 PC2 为 SoC1，PC3 为 SoC2。这里重启的是原生交互应用，不是重启整台机器人，也不删除原生代码。
-
-| 模式/操作 | 用途 |
-|---|---|
-| `only_voice` + 重启原生 agent | 切换到自研语音接入模式；实际核对原生大模型不再回答，再启动本项目 Agent。原生应用需要重新启动，不能一直停着。 |
-| `normal` + 重启原生 agent | 恢复机器人的原生语音问答；先停止本项目 Agent，避免两套系统同时使用音频。 |
-| `stop-app` / `start-app` | 分别停止、启动 PC3 上的原生 agent，让修改后的模式生效。两种模式都使用这一对命令，具体模式由此前设置的属性决定。 |
-
-### 1. 从电脑连接 PC2
-
-**在电脑 Windows PowerShell 执行**。先从机器人信息页查看当次 Wi-Fi IP，不沿用旧地址；输入密码时不显示字符是正常现象。
-
-```powershell
-$RobotIp = (Read-Host '输入机器人当前 Wi-Fi IP').Trim()
-if ([string]::IsNullOrWhiteSpace($RobotIp)) { throw '机器人 IP 不能为空' }
-ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "agi@${RobotIp}"
-```
-
-看到机器人 Ubuntu 登录信息后才执行后面的 Linux 命令。若已经在 PC2 SSH 窗口，跳过这一步。`client_loop ... Connection reset` 表示 SSH 已断开，回到 `PS C:\...>` 后应重新连接，不能继续输入 `source` 或 Linux 路径。
-
-### 2. 选择一种模式，在 PC2 设置
-
-先在正在运行自研 Agent 的窗口按 `Ctrl+C`，等程序退出；诊断脚本也先停止。**下面 A、B 二选一，不要依次都运行。**
-
-**A. 接入自研大模型：暂停原生大模型回答。** 在 PC2 SSH 窗口执行：
-
-```bash
-source /home/agi/aimdk/install/local_setup.bash
-ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/SetAgentPropertiesRequest "{contents: {properties: [{key: {value: 2}, value: 'only_voice'}]}}"
-```
-
-**B. 恢复原生交互：让机器人重新用原生大模型回答。** 在 PC2 SSH 窗口执行：
-
-```bash
-source /home/agi/aimdk/install/local_setup.bash
-ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/SetAgentPropertiesRequest "{contents: {properties: [{key: {value: 2}, value: 'normal'}]}}"
-```
-
-等出现 `response` 后再继续。手头机器曾返回 `code=0`、`status.value=0 (UNKNOWN)`；这不能单独证明模式已生效，还必须执行下一节重启并按实际问答行为确认。若一直没有响应或报错，先记录输出并排查，不要当作设置成功。
-
-### 3. 登录 PC3，逐行重启原生 agent
-
-仍在 **PC2 SSH 窗口**执行：
-
-```bash
-ssh agi@10.0.1.42
-```
-
-`10.0.1.42` 是手头机器人曾多次实测的 **PC3 机内网络地址**，不是会变化的 Wi-Fi 地址，也不是所有机器通用的地址；其他机器人需核对其内部拓扑。自行输入 SSH 密码，看到 SoC2 登录横幅后，再在 **PC3** 逐行执行：
-
-```bash
-aima em stop-app agent
-```
-
-等显示停止成功，再执行：
-
-```bash
-aima em start-app agent
-```
-
-等显示启动成功，再执行：
-
-```bash
-exit
-```
-
-`exit` 退出本次 PC3 登录，返回原来的 PC2 SSH 会话。**若停止或启动任何一步失败，停在该步骤核对错误，不要继续启动自研 Agent。** 不要用 `stop-all`，也不要省略 `start-app agent`。
-
-### 4. 用真实语音确认结果
-
-等待模块启动后，先不运行本项目 Agent，说原生唤醒词，再问“现在几点”：
-
-- 选择 `only_voice` 时：核对原生大模型不再回答；再按[真机启动步骤](docs/zh-CN/reproduce-on-x2.md)启动自研 Agent。`X2_ONLY_VOICE_CONFIRMED=1` 只是操作者的确认标志，不会替你切换模式。
-- 选择 `normal` 时：应重新听到原生语音回答。确认恢复后即可保留原生系统运行；本项目自研 Agent 保持停止。
-
-停止自研程序或退出 SSH 都不会自动恢复 `normal`。也不能把“没有回答”单独当作模式设置成功的充分证据：若模块未启动、网络或收音异常，同样可能没有回答，应结合启动结果和已验证的收音链路核对。
-
-### 常见错误
-
-| 现象 | 处理 |
-|---|---|
-| `The passed service type is invalid` | 在 PC2 当前 SSH 会话重新执行 `source /home/agi/aimdk/install/local_setup.bash`，再核对服务类型。 |
-| `agent 不存在`，应用列表没有 agent | 检查是否误在 PC2 执行了 aima 命令；手头机器的原生 agent 位于 PC3。 |
-| PowerShell 提示 source、python3 或 Linux 路径不存在 | 当前仍在 Windows，先 SSH 登录机器人。 |
-| 已设置 normal，但仍不回答 | 确认自研 Agent 已停止、PC3 启动成功；保留输出核查，不把重启命令成功等同于语音恢复成功。 |
-
-模式切换与恢复的历史实测证据见[11月8日联调记录](docs/zh-CN/2026-11-08-x2-real-robot-integration.md)和[复现指南](docs/zh-CN/reproduce-on-x2.md)。
-
-## 每次启动自研交互与查看食堂反馈
-
-以下使用已部署的真机项目。首次部署、配置机器人项目根目录的私有 `.env` 和更新离线包，先按[复现指南](docs/zh-CN/reproduce-on-x2.md)完成；不要把 Key 写入源码或提交到 Git。原生模式切换按上节操作，不需要每次重复切换已经确认生效的模式。
-
-### 1. 电脑 Windows PowerShell：连接机器人 PC2
-
-```powershell
-$RobotIp = Read-Host '输入机器人当前 Wi-Fi IP'
-ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "agi@${RobotIp}"
-```
-
-输入当前地址和 SSH 密码，确认进入机器人 Linux 提示符后，才能执行下面的 Bash 命令。若出现 `Connection reset` 并回到 `PS C:\...>`，先重新连接。
-
-### 2. 机器人 PC2 SSH：启动语音、表情和动作
-
-前提：旧自研 Agent 已停止，已按上节完成 `only_voice` 设置及原生 agent 重启、实际确认；机器人处于稳定站立且动作空间足够。下列命令会启用模型自主选择的表情和预设动作；程序不会自动切换原生模式或站立模式。
-
-```bash
-cd /home/agi/eldercare-x2/eldercare_x2
-source /home/agi/aimdk/install/local_setup.bash
-mkdir -p logs
-SESSION_ID=$(date +%Y%m%d_%H%M%S)
-export DOUBAO_ASR_HOTWORDS='["灵犀"]'
-export X2_ONLY_VOICE_CONFIRMED=1
-python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend aimdk --enable-robot-presentation --enable-robot-motion --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback.jsonl --log-file "logs/autonomy_${SESSION_ID}.log" --metrics-file "logs/autonomy_${SESSION_ID}_metrics.json"
-```
-
-Key由机器人项目 `.env` 自动读取，无需每次粘贴。保持此SSH窗口运行，说“你好灵犀”，等它询问后开始对话。日志保存在机器人项目 `logs/` 内；食堂反馈在复述后由用户明确确认，再写入 `data/dining_feedback.jsonl`。
-
-### 3. 电脑另开 Windows PowerShell：打开反馈表网页
-
-在电脑仓库根目录执行（不要在机器人SSH窗口执行）：
-
-```powershell
-.\open_dining_dashboard.cmd
-```
-
-若电脑仓库仍在本项目开发时的路径，可从任意 PowerShell 目录执行：
-
-```powershell
-& 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
-```
-
-在其他电脑上复现时使用实际克隆目录中的同名入口。按提示输入当前机器人 Wi-Fi IP，并在打开的SSH窗口输入密码；连通后自动打开浏览器，保留连接窗口。默认读取的反馈路径与上面的Agent启动参数一致。
-
-**网页只用于查看，不负责保存。** 不打开或关闭网页时，运行中的Agent仍可在用户明确确认后保存反馈；以后打开网页即可查看。Agent未运行时，不会通过本项目新增语音反馈记录。
-
-### 4. 停止自研交互
-
-在运行Agent的PC2 SSH窗口按 `Ctrl+C`，退出后执行：
-
-```bash
-unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS
-```
-
-这只清理当前终端的临时标志，不删除 `.env`、日志或已保存反馈；也不会自动恢复原生问答。需要恢复原生交互时，按上节设置 `normal` 并在PC3重启原生agent，再实际验证语音回答。
-
-## 代码位置
-
-| 路径 | 作用 |
-|---|---|
-| `x2_agent/agent.py`、`x2_agent/model_dialogue.py` | 会话调度、模型对话、上下文记忆与表现选择 |
-| `x2_agent/asr.py`、`x2_agent/tts.py` | 豆包语音识别和合成 |
-| `x2_agent/aimdk_audio.py`、`x2_agent/aimdk_transport.py`、`x2_agent/aimdk_playback.py` | 真机 ROS 音频输入、事件适配和播放 |
-| `x2_agent/presentation.py` | 表情与预设动作的受限映射 |
-| `data/`、`x2_agent/life_assistance.py`、`x2_agent/dining_feedback.py` | 用药资料、健康提醒和食堂意见处理 |
-| `scripts/robot_preflight.py`、`scripts/aimdk_*_probe.py` | 只读兼容性与语音探针 |
-| `scripts/build_robot_bundle.py`、`scripts/run_robot_agent.py` | 离线打包与真机启动入口 |
-| `tests/` | 无机器人时的回归测试 |
-
-## 仿真回归
-
-Windows 便携模拟器运行时，在仓库根目录安装 `requirements.txt`，在本地 `.env` 配置两把 API Key，再执行 `python agent.py --competition-mode --health-semantic model`。这一入口默认走 Unity WebSocket；真机入口与步骤见上方复现指南。仿真细节见[中文指南](docs/zh-CN/README.md)。
-
-四款 Doubao-Seed 对话模型的同题测试、赛事分档暂估、逐轮原始结果与复现脚本见[2026-11-08 模型对比记录](docs/zh-CN/model-evaluation/2026-11-08/赛事评分对比.md)。当前默认模型仍为 `doubao-seed-2-0-mini-260428`。
-
-## 数据与来源
-
-`.gitignore` 排除了 `.env`、录音、历史反馈、缓存与生成的 ZIP。药品资料和提醒内容为项目配置，不能代替个人处方或真实预约记录。开源基础与改动说明见[开源引用说明](开源引用说明.md)及仓库提交历史。
-
-纯语音对照与十轮连续对话测试见[真机对话验收步骤](docs/zh-CN/voice-dialogue-acceptance.md)，包含日志和耗时记录方式；该对照流程关闭表情动作，日常完整联测使用上面的启动命令。
-
-环节四真机语音确认、独立反馈记录及电脑SSH隧道查看网页，见[社区食堂意见收集测试步骤](docs/zh-CN/stage4-dining-feedback.md)。
-
-Windows查看机器人食堂反馈表可双击仓库根目录`open_dining_dashboard.cmd`，输入当前IP并在新SSH窗口输入密码；连通后自动打开网页，保留该SSH窗口。
+| 首次部署、接口探针与兼容性 | [复现指南（v0.3.0语音基线）](docs/zh-CN/reproduce-on-x2.md)、[现场部署选择](docs/zh-CN/onsite-deployment.md)；当前完整联动按本README |
+| 29项动作及表情 | [自主表现目录](docs/zh-CN/autonomous-presentation.md)、[11月19日联调](docs/zh-CN/2026-11-19-presentation-integration.md) |
+| 本轮录屏整理 | [时间轴与异常记录](docs/zh-CN/2026-11-19-screen-recording-walkthrough.md) |
+| 食堂意见与网页 | [食堂反馈步骤](docs/zh-CN/stage4-dining-feedback.md) |
+| 语音对照与历史问题 | [语音验收](docs/zh-CN/voice-dialogue-acceptance.md)、[ASR诊断](docs/zh-CN/2026-11-18-x2-asr-diagnosis.md)、[播音与保存路径](docs/zh-CN/2026-11-18-playback-and-feedback-path.md) |
+| 模型比较与版本 | [四模型记录](docs/zh-CN/model-evaluation/2026-11-08/赛事评分对比.md)、[版本管理](docs/zh-CN/version-management.md)、[CHANGELOG](CHANGELOG.md) |
+| Docker候选 | [构建记录](docs/zh-CN/2026-11-18-container-build.md)、[容器复现](docs/zh-CN/docker-reproduction.md)，尚未真机验收 |
+| 主要代码 | `x2_agent/agent.py` 会话；`model_dialogue.py` 模型规划；`aimdk_*` 真机音频；`presentation.py` 表情动作；`dining_feedback.py` 保存；`scripts/run_robot_agent.py` 启动 |
+
+仿真回归：准备Unity便携模拟器及依赖、私有 `.env` 后，在电脑仓库根目录执行 `python agent.py --competition-mode --health-semantic model`，详见[中文开发指南](docs/zh-CN/README.md)。本README的真机入口使用AimDK，不使用Unity连接。
+
+`.gitignore` 排除私有配置、运行日志、录音、真实JSONL和生成ZIP。药品资料与提醒为演示配置，不能代替个人医嘱或真实预约。开源来源见[开源引用说明](开源引用说明.md)。
