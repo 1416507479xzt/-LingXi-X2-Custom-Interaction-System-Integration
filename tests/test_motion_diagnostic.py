@@ -42,6 +42,19 @@ class ReadOnlyTests(unittest.TestCase):
         client.call_async.assert_not_called()
         node.destroy_client.assert_called_once_with(client)
 
+    def test_both_read_header_layouts_get_current_stamp(self):
+        for field in ('request', 'header'):
+            node = Mock()
+            client = node.create_client.return_value
+            client.wait_for_service.return_value = True
+            client.call_async.return_value.done.return_value = True
+            common = NS(header=NS(stamp=None))
+            request = NS(**{field: common})
+            diag.query_once(Mock(), node, 'GetSystemState' if field == 'header' else 'GetMcAction',
+                            NS(Request=lambda: request))
+            self.assertIs(common.header.stamp, node.get_clock().now().to_msg.return_value)
+            client.call_async.assert_called_once_with(request)
+
     def test_read_response_is_preserved_and_client_destroyed(self):
         node = Mock()
         client = node.create_client.return_value

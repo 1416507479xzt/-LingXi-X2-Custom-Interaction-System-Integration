@@ -161,3 +161,12 @@ PC2用户直接查看 /agibot/software/v0/common 和share返回Permission denied
 依据[官方Python例程](https://x2-aimdk.agibot.com/zh-cn/latest/example/Python.html)关注跨板ROS服务问题；只读模式查询使用当前时间戳。不把文档中的重试写法未经核对直接用于结果不明的动作请求。当前仍未查明挥手无响应的根因，SDK版本差异仅为假设，等待诊断输出。
 
 PC2加载原SDK后执行：python3 /home/agi/eldercare-x2/eldercare_x2/scripts/aimdk_motion_diagnostic.py。该脚本不依赖Agent运行，保持自研Agent停止，完成后把JSON输出作为下一步判断依据。
+
+
+## PC2只读诊断输出：模式响应、类型缺失与系统状态超时
+
+SDK仍是/home/agi/aimdk/install的v1.0.0-ga424add；SetMcPresetMotion请求不含input_source。GetMcAction一次返回STAND_DEFAULT/status100；GetSystemState服务存在（/soc0_sm3599），本次一次只读请求超时。/mc_ros2_node3606提供GetMcMotions和GetMcPresetMotionState，但本地SDK中二者类型缺失。这是接口覆盖差异的直接证据，不是SetMcPresetMotion序列化必然不兼容的证据，也不能因单次读超时断定开发者模式或系统状态。
+
+诊断找到实际官方例程 /home/agi/aimdk/src/py_examples/py_examples/preset_motion_client.py；后续只读其源码，核对机载版本的构造、时间戳和调用方式，不直接运行含写请求/重试的例程。
+
+检查诊断实现时还发现GetSystemState使用header/CommonRequest布局，原脚本只给request/CommonRequest布局填当前时间；本地已兼容这两种只读请求头并补测试。该遗漏不证明超时根因，修正后仍未取得真机系统状态。收窄例程路径查找，避免将生成的消息Python文件误标作例程。五项诊断离线测试通过；目前无需为了该修正再次上传/运行诊断，优先读取现有官方例程。

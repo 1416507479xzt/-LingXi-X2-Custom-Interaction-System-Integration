@@ -25,8 +25,9 @@ def query_once(ros, node, name, service_type, timeout=3):
             return {"status": "unavailable"}
         request = service_type.Request()
         # Match the official read-only example's current timestamp.
-        if hasattr(request, "request") and hasattr(request.request, "header"):
-            request.request.header.stamp = node.get_clock().now().to_msg()
+        common = getattr(request, "request", getattr(request, "header", None))
+        if common is not None and hasattr(common, "header"):
+            common.header.stamp = node.get_clock().now().to_msg()
         future = client.call_async(request)
         try:
             ros.spin_until_future_complete(node, future, timeout_sec=timeout)
@@ -61,7 +62,7 @@ def main():
             "request": service_type.Request.get_fields_and_field_types(),
             "response": service_type.Response.get_fields_and_field_types()})
     report["installed_preset_examples"] = [str(p) for p in
-        Path("/home/agi/aimdk/src").rglob("*preset*motion*.py")][:10]
+        Path("/home/agi/aimdk/src/py_examples").rglob("*preset*motion*.py")][:10]
     ros.init()
     node = ros.create_node("eldercare_motion_readonly_diagnostic")
     try:
