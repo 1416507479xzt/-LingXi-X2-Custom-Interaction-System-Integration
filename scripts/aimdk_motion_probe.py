@@ -1,10 +1,16 @@
-"""PC2-only, one-shot right-hand wave probe; default is a read-only mode query.
+"""PC2-only, one-shot documented preset probe; default is a read-only mode query.
 
 Use --execute only after preparing stable stand and a clear arm workspace.
 No retries, SDK replacement, mode switching, or PC1 access.
 """
 import argparse
 import json
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from x2_agent.presentation import MOTIONS, GESTURE_MEANINGS, PHYSICALLY_VERIFIED_MOTIONS
 
 
 def call_once(ros, node, service_type, service_name, make_request, timeout):
@@ -28,8 +34,11 @@ def call_once(ros, node, service_type, service_name, make_request, timeout):
         node.destroy_client(client)
 
 
-def probe(ros, node, services, execute=False):
-    report = {'scope': 'PC2; right wave at most once; no mode change',
+def probe(ros, node, services, execute=False, gesture="wave_hands"):
+    if gesture not in MOTIONS:
+        raise ValueError("Unsupported preset gesture")
+    report = {'scope': 'PC2; selected preset at most once; no mode change',
+              'gesture': gesture,
               'execute_requested': execute, 'motion_requests': 0}
     def mode_request():
         request = services.GetMcAction.Request()
@@ -52,13 +61,12 @@ def probe(ros, node, services, execute=False):
         return report
     def motion_request():
         request = services.SetMcPresetMotion.Request()
-        request.area.value = 2
-        request.motion.value = 1002
+        request.motion.value, request.area.value = MOTIONS[gesture]
         request.interrupt = False
         request.play_timestamp = 0
         request.header.stamp = node.get_clock().now().to_msg()
         report['motion_requests'] = 1
-        print('稳定站立已核对；发送一次右手挥手，使用当前请求时间戳；不自动重发。', flush=True)
+        print('稳定站立已核对；发送一次预设动作 ' + gesture + '，使用当前请求时间戳；不自动重发。', flush=True)
         return request
     response, result = call_once(ros, node, services.SetMcPresetMotion,
         '/aimdk_5Fmsgs/srv/SetMcPresetMotion', motion_request, 8)
@@ -72,8 +80,15 @@ def probe(ros, node, services, execute=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--execute', action='store_true', help='额外允许单次右手挥手；默认只读查询')
+    parser.add_argument('--execute', action='store_true', help='额外允许所选预设动作一次；默认只读查询')
+    parser.add_argument('--gesture', choices=sorted(MOTIONS), default='wave_hands')
+    parser.add_argument('--list', action='store_true', help='只列动作目录，不初始化ROS')
     args = parser.parse_args()
+    if args.list:
+        print(json.dumps({name: {'motion': pair[0], 'area': pair[1],
+            'meaning': GESTURE_MEANINGS[name], 'physically_verified':name in PHYSICALLY_VERIFIED_MOTIONS}
+            for name,pair in MOTIONS.items()}, ensure_ascii=False, indent=2))
+        return
     try:
         import rclpy
         import aimdk_msgs.srv as services
@@ -82,7 +97,7 @@ def main():
     rclpy.init()
     node = rclpy.create_node('eldercare_single_wave_probe')
     try:
-        print(json.dumps(probe(rclpy, node, services, args.execute), ensure_ascii=False, indent=2))
+        print(json.dumps(probe(rclpy, node, services, args.execute, args.gesture), ensure_ascii=False, indent=2))
     finally:
         node.destroy_node()
         if rclpy.ok():

@@ -136,12 +136,12 @@ class ExpressionOnlyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(results[0]['attempts'], 2)
         self.assertEqual([c.args[0] for c in backend._call.call_args_list], ['emoji','emoji'])
 
-    async def test_untested_left_hand_motion_is_blocked_before_any_rpc(self):
+    async def test_arbitrary_nonpreset_motion_is_rejected_before_any_rpc(self):
         backend = self.deferred_backend()
         backend.enable_motion = True
         backend._call = AsyncMock()
-        results = await backend.dispatch(None, 'wave_left', lambda: True)
-        self.assertEqual(results[0]['status'], 'blocked')
+        with self.assertRaises(ValueError):
+            await backend.dispatch(None, 'walk', lambda: True)
         backend._call.assert_not_awaited()
 
     async def test_no_clear_event_means_no_retry(self):

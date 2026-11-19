@@ -22,7 +22,12 @@ MOTIONS = {"wave_hands": (1002, 2), "wave_left": (1002, 1),
            "arms_level": (1010, 3), "arm_level_right": (1010, 2),
            "arm_level_left": (1010, 1), "bye": (3031, 11),
            "cross_arms": (3009, 11), "wave_chest": (1011, 2),
-           "bow": (3001, 11), "scratch_head": (3024, 11)}
+           "bow": (3001, 11), "scratch_head": (3024, 11),
+           "shake_right": (1003, 2), "shake_left": (1003, 1),
+           "air_kiss_right": (1004, 2), "air_kiss_left": (1004, 1),
+           "lightwave": (3007, 11), "high_five_right": (1008, 2),
+           "high_five_left": (1008, 1), "wave_chest_left": (1011, 1),
+           "scratch_hip": (3025, 11)}
 EMOTION_MEANINGS = dict(zip(EMOJI_IDS, [
     "眨眼", "平静和自然倾听，可主动恢复", "平静眼睛变化2", "游戏",
     "卖萌", "闭眼", "睁眼", "无聊，不用于对长者表达不耐烦",
@@ -30,16 +35,20 @@ EMOTION_MEANINGS = dict(zip(EMOJI_IDS, [
     "悲伤，仅在语境确实合适时，不能把身体疲劳等同悲伤", "同情和关怀，不应每轮重复",
     "疑惑", "震惊，不夸大健康风险", "撒娇，谨慎使用", "严肃", "思考",
     "愤怒，不对长者发怒", "崇拜和赞赏，不等于同情"]))
-# Runtime catalog is limited to the physically verified right-hand wave.
-# Other mappings above are references, not enabled robot capabilities.
-VERIFIED_MOTIONS = {"wave_hands": MOTIONS["wave_hands"]}
+# Catalog inclusion is not a claim of physical validation on every firmware.
+PHYSICALLY_VERIFIED_MOTIONS = frozenset({"wave_hands"})
+MOTION_SOURCE = "https://x2-aimdk.agibot.com/zh-cn/v0.9.0/Interface/control_mod/preset_motion.html"
+MOTION_SOURCE_CURRENT = "https://x2-aimdk.agibot.com/zh-cn/latest/Interface/control_mod/preset_motion.html"
 GESTURE_MEANINGS = dict(zip(MOTIONS, [
     "右手挥手，问候或告别", "左手挥手", "右手举手", "左手举手",
     "鼓掌，祝贺或鼓励", "右手敬礼", "左手敬礼", "双手比心，表达关怀",
     "右手比心", "左手比心",
     "拥抱姿态；Unity仅张开双臂的近似展示，无接触；真机须保持安全距离",
     "加油，鼓励", "双手平举", "右手平举", "左手平举", "拜拜",
-    "双手打叉", "胸前右手挥手", "鞠躬", "挠头"]))
+    "双手打叉", "胸前右手挥手", "鞠躬", "挠头",
+    "右手握手的预设伸手姿态，需要对方配合", "左手握手的预设伸手姿态，需要对方配合",
+    "右手飞吻", "左手飞吻", "动感光波，夸张表演动作", "右手击掌的预设姿态，需要对方配合",
+    "左手击掌的预设姿态，需要对方配合", "胸前左手挥手", "抓屁股，滑稽表演动作，不作为普通关怀动作"]))
 UNITY_EMOTIONS = {"neutral": "neutral", "happy": "happy", "sad": "sad",
                   "sympathy": "love", "surprised": "surprised",
                   "angry": "angry", "admiration": "love"}
@@ -58,7 +67,7 @@ def capabilities(control=True, backend="unity", *, enable_motion=False):
                 "emotion_meanings": {}, "gesture_meanings": {},
                 "backend": "none", "visual_limit": ""}
     emotions = list(EMOJI_IDS if backend == "aimdk" else UNITY_EMOTIONS) if control else []
-    gestures = list((VERIFIED_MOTIONS if enable_motion else {}) if backend == "aimdk" else
+    gestures = list((MOTIONS if enable_motion else {}) if backend == "aimdk" else
                     [name for name in MOTIONS if name in UNITY_GESTURES]) if control else []
     explanation_candidates = (["raise_right", "raise_left"] if backend == "aimdk" else ["open_arms"])
     return {"emotions": emotions, "gestures": gestures,
@@ -66,12 +75,17 @@ def capabilities(control=True, backend="unity", *, enable_motion=False):
             "explanation_note": (
                 "肢体动作未开启；只可选择屏幕表情，gesture必须为null。"
                 if backend == "aimdk" and not enable_motion else
-                "当前只开放右手挥手，用于招呼或告别，不是讲解手势；不要每轮建议都挥手。"
+                "可选举手配合一次讲解，但不是治疗或康复示范；其他动作按语义选择，不必每轮动作。"
                 if backend == "aimdk" else
                 "open_arms是已有的双臂展开动画，可近似配合一次友善说明，不是专门的摊掌讲解动画。"
                 "wave_hands只用于招呼/告别，不用来反复解释健康建议。"),
             "emotion_meanings": {k: EMOTION_MEANINGS[k] for k in emotions},
             "gesture_meanings": {k: GESTURE_MEANINGS[k] for k in gestures},
+            "motion_validation": {name: ("physically_verified" if name in PHYSICALLY_VERIFIED_MOTIONS
+                                         else "documented_not_physically_verified") for name in gestures},
+            "partner_gestures": [name for name in gestures if name in
+                                 {"shake_right", "shake_left", "high_five_right", "high_five_left", "open_arms"}],
+            "autonomy_note": "结合用户原话和上下文自主选择回答、表情和一个动作或null；目录不代表动作已完成。",
             "backend": backend,
             "visual_limit": "Unity的sympathy和admiration都近似显示爱心；不同于真机素材" if backend == "unity" else ""}
 
@@ -213,9 +227,9 @@ class AimdkPresentation:
                     receipt["reason"] = "service_unavailable_or_response_timeout"
                 results.append(receipt)
             if gesture:
-                if not self.enable_motion or gesture not in VERIFIED_MOTIONS:
+                if not self.enable_motion:
                     results.append({"kind": "gesture", "name": gesture,
-                                    "status": "blocked", "reason": "motion_not_enabled_or_verified"})
+                                    "status": "blocked", "reason": "motion_not_enabled"})
                     return results
                 status = "blocked"
                 if allowed() and time.monotonic() - self.last_motion >= 8:
@@ -226,7 +240,7 @@ class AimdkPresentation:
                             and state.info.action_desc == "STAND_DEFAULT"
                             and state.info.status.value == 100 and allowed()):
                         req = self.types["motion"].Request()
-                        req.motion.value, req.area.value = VERIFIED_MOTIONS[gesture]
+                        req.motion.value, req.area.value = MOTIONS[gesture]
                         req.interrupt = False
                         # Match the installed v1.0 example and the physically
                         # verified one-shot probe. Do not use a future schedule.

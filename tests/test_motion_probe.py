@@ -53,6 +53,20 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(result['task_response'], {'code':0, 'task_id':17, 'state':400})
         self.assertEqual(result['motion_requests'], 1)
 
+    def test_selected_documented_motion_uses_its_own_pair(self):
+        node, services, read, write = self.setup_probe()
+        result = probe.probe(Mock(), node, services, execute=True, gesture='shake_left')
+        request = write.call_async.call_args.args[0]
+        self.assertEqual((request.motion.value,request.area.value),(1003,1))
+        self.assertEqual(result['gesture'],'shake_left')
+        write.call_async.assert_called_once()
+
+    def test_unknown_motion_rejected_before_any_ros_client(self):
+        node, services, read, write = self.setup_probe()
+        with self.assertRaises(ValueError):
+            probe.probe(Mock(),node,services,execute=True,gesture='walk')
+        node.create_client.assert_not_called()
+
     def test_timeout_is_unknown_and_never_resends(self):
         node, services, read, write = self.setup_probe(completed=False)
         result = probe.probe(Mock(), node, services, execute=True)

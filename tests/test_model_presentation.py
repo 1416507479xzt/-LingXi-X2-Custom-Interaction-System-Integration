@@ -61,21 +61,20 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
         unity = capabilities()
         aimdk = capabilities(backend="aimdk", enable_motion=True)
         self.assertEqual(len(EMOJI_IDS), 20)
-        self.assertEqual(len(MOTIONS), 20)
+        self.assertEqual(len(MOTIONS), 29)
         for catalog in (unity, aimdk):
             self.assertEqual(set(catalog["emotions"]), set(catalog["emotion_meanings"]))
             self.assertEqual(set(catalog["gestures"]), set(catalog["gesture_meanings"]))
         self.assertNotIn("clap", unity["gestures"])
-        self.assertNotIn("clap", aimdk["gestures"])
-        self.assertEqual(set(aimdk["gestures"]),
-                         {"wave_hands"})
+        self.assertIn("clap", aimdk["gestures"])
+        self.assertEqual(set(aimdk["gestures"]), set(MOTIONS))
         self.assertEqual(MOTIONS["clap"], (3017, 11))
         self.assertEqual(MOTIONS["heart_both"], (1007, 3))
         self.assertEqual(EMOJI_IDS["neutral"], 10)
         self.assertEqual(EMOJI_IDS["sympathy"], 120)
         self.assertEqual(capabilities(False, "aimdk")["gestures"], [])
         self.assertEqual(unity["explanation_gestures"], ["open_arms"])
-        self.assertEqual(aimdk["explanation_gestures"], [])
+        self.assertEqual(aimdk["explanation_gestures"], ["raise_right", "raise_left"])
         self.assertEqual(capabilities(False)["explanation_gestures"], [])
 
     def test_model_can_choose_expanded_but_not_unavailable_capabilities(self):
@@ -84,7 +83,7 @@ class ContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.validate(gesture="clap"))
         self.ctx["capabilities"] = capabilities(backend="aimdk", enable_motion=True)
         self.assertIsNotNone(self.validate(emotion="thinking", gesture="wave_hands"))
-        self.assertIsNone(self.validate(emotion="thinking", gesture="heart_both"))
+        self.assertIsNotNone(self.validate(emotion="thinking", gesture="heart_both"))
         self.assertEqual(unity_plan("neutral", "open_arms", "您好"),
                          [("emotion", "neutral", {}), ("gesture", "open_arms", {})])
         with self.assertRaises(ValueError):

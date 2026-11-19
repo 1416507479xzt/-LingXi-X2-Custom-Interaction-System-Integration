@@ -1,0 +1,151 @@
+{
+  "scope": "Synthetic text planning only; no robot, TTS or ROS calls",
+  "model": "doubao-seed-2-0-mini-260428",
+  "cases": [
+    {
+      "case": "greeting",
+      "user": "你好灵犀",
+      "answer": {
+        "reply": "您好，我在呢。今天感觉怎么样？",
+        "emotion": "happy",
+        "gesture": "wave_hands",
+        "intent": "greeting",
+        "action": "continue"
+      },
+      "generation_ms": 875,
+      "valid": true,
+      "explicit_gesture_match": null
+    },
+    {
+      "case": "left_wave",
+      "user": "请用左手挥挥手，右手不要动。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "我这就按您说的，只挥动左手啦。",
+        "emotion": "neutral",
+        "gesture": "wave_left"
+      },
+      "generation_ms": 1046,
+      "valid": true,
+      "explicit_gesture_match": true
+    },
+    {
+      "case": "clap",
+      "user": "请给我鼓鼓掌。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "好的，这就为您鼓掌。",
+        "emotion": "happy",
+        "gesture": "clap"
+      },
+      "generation_ms": 720,
+      "valid": true,
+      "explicit_gesture_match": true
+    },
+    {
+      "case": "heart",
+      "user": "请用双手比个心。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "好呀，我用双手比个心送给您。",
+        "emotion": "happy",
+        "gesture": "heart_both"
+      },
+      "generation_ms": 1630,
+      "valid": true,
+      "explicit_gesture_match": true
+    },
+    {
+      "case": "salute",
+      "user": "请敬一个右手礼。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "好的，我这就给您敬个右手礼。",
+        "emotion": "neutral",
+        "gesture": "salute_right"
+      },
+      "generation_ms": 821,
+      "valid": true,
+      "explicit_gesture_match": true
+    },
+    {
+      "case": "refuse",
+      "user": "别做任何动作，只跟我说一句鼓励的话。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "您一定能慢慢好起来的，别着急呀。",
+        "emotion": "happy",
+        "gesture": null
+      },
+      "generation_ms": 1428,
+      "valid": true,
+      "explicit_gesture_match": true
+    },
+    {
+      "case": "fatigue",
+      "user": "我今天有点疲惫。",
+      "answer": {
+        "intent": "other",
+        "action": "continue",
+        "reply": "若没有受伤，可尝试保持规律的睡眠时间，营造合适的睡眠环境。这种疲惫影响您今天做事了吗？",
+        "emotion": "sympathy",
+        "gesture": "heart_left"
+      },
+      "generation_ms": 905,
+      "valid": true,
+      "explicit_gesture_match": null
+    },
+    {
+      "case": "autonomous_encouragement",
+      "user": "我今天按计划完成了阅读和散步，感觉很开心。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "真好呀，按计划完成活动还能有好心情，很替您高兴。",
+        "emotion": "happy",
+        "gesture": "clap"
+      },
+      "generation_ms": 1392,
+      "valid": true,
+      "explicit_gesture_match": null
+    },
+    {
+      "case": "invited_handshake",
+      "user": "我愿意和您握手，请伸出右手。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "好的，我伸出右手啦。",
+        "emotion": "happy",
+        "gesture": "shake_right"
+      },
+      "generation_ms": 922,
+      "valid": true,
+      "explicit_gesture_match": true
+    },
+    {
+      "case": "explicit_performance",
+      "user": "请做一个动感光波动作。",
+      "answer": {
+        "intent": "chat",
+        "action": "continue",
+        "reply": "好呀，看我做动感光波～",
+        "emotion": "playful",
+        "gesture": "lightwave"
+      },
+      "generation_ms": 1581,
+      "valid": true,
+      "explicit_gesture_match": true
+    }
+  ],
+  "valid_count": 10,
+  "explicit_match_count": 7,
+  "explicit_case_count": 7,
+  "robot_actions_executed": false,
+  "assessment_limit": "Text planning only; not physical or clinical acceptance; no ASR/TTS latency measured"
+}
