@@ -145,9 +145,18 @@ class AimdkPresentation:
                 req.mode = 1  # once, never indefinite loop
                 req.priority = 1  # must not mask system fault indications (8/10)
                 response = await self._call("emoji", req)
-                results.append({"kind": "emotion", "name": emotion,
-                                "status": "unknown" if response is None else
-                                ("accepted" if response.success else "rejected")})
+                receipt = {"kind": "emotion", "name": emotion,
+                           "emotion_id": req.emotion_id,
+                           "mode": req.mode, "priority": req.priority,
+                           "status": "unknown" if response is None else
+                           ("accepted" if response.success else "rejected")}
+                if response is not None:
+                    # This SDK's CommonResponse header is not the success flag.
+                    # Keep the actual rejection explanation, not only a boolean.
+                    receipt["message"] = str(getattr(response, "message", ""))[:240]
+                else:
+                    receipt["reason"] = "service_unavailable_or_response_timeout"
+                results.append(receipt)
             if gesture:
                 if not self.enable_motion or gesture not in VERIFIED_MOTIONS:
                     results.append({"kind": "gesture", "name": gesture,

@@ -67,3 +67,12 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 测试招呼、疲惫求助及食堂意见确认；观察屏幕、听语音连续性、查看记录及日志“模型表现下发结果”。服务accepted不等于用户看到显示，模型选null也不应当作接口失败。机器人应没有肢体动作。结束Ctrl+C后执行 unset X2_ONLY_VOICE_CONFIRMED DOUBAO_ASR_HOTWORDS；如需原生问答再按README恢复normal。
 
 第三版标签继续保留原始语音基线；本轮为main后续开发，离线包清单使用Git提交号区分，不把本轮待联动验证的功能追认到v0.3.0标签。
+
+
+## 对话中未见表情的首轮排查
+
+用户反馈只有默认表情；10:26日志中，neutral两次accepted、一次rejected，sympathy一次rejected。模型有选表情，不是全部输出null；accepted的neutral本来就可能与默认外观接近。旧日志丢弃服务message，不能据此确定拒绝原因。
+
+停止自研Agent后，用户再次直接请求emotion_id=120、mode=1、priority=1，返回success=True、message=成功，且屏幕实际显示表情；ROS图存在 /face_ui_proxy/status [aimdk_msgs/msg/FaceEmojiStatus]。证明关切素材/编号及单次服务调用可用，不证明对话时的间歇拒绝已解决。优先级冲突只是候选原因，尚无该次拒绝的message或同期状态证据；也可能存在其他显示资源条件。
+
+本轮仅补齐表现回执的emotion_id、mode、priority和外层message（限240字符）；无响应明确记unknown，不把超时等同拒绝。保持priority=1、不重试、不关闭系统显示模块，不修改对话、音频或肢体动作开关。相关34项聚焦回归通过；下一次先更新presentation.py，重复对话并查看完整服务message，再决定修复办法。

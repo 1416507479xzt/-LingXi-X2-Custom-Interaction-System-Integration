@@ -57,6 +57,30 @@ class ExpressionOnlyTests(unittest.IsolatedAsyncioTestCase):
         backend._call.assert_awaited_once()
         self.assertEqual(backend._call.call_args.args[0], 'emoji')
 
+    async def test_rejected_emoji_keeps_server_reason_and_request_parameters(self):
+        backend = object.__new__(AimdkPresentation)
+        backend.enable_motion = False
+        backend.lock = asyncio.Lock()
+        backend.types = {'emoji': NS(Request=lambda: NS())}
+        backend._call = AsyncMock(return_value=NS(success=False, message='priority conflict'))
+        results = await backend.dispatch('sympathy', None, lambda: True)
+        self.assertEqual(results[0]['status'], 'rejected')
+        self.assertEqual(results[0]['message'], 'priority conflict')
+        self.assertEqual((results[0]['emotion_id'], results[0]['mode'],
+                          results[0]['priority']), (120, 1, 1))
+        backend._call.assert_awaited_once()
+
+    async def test_missing_response_is_unknown_without_retry(self):
+        backend = object.__new__(AimdkPresentation)
+        backend.enable_motion = False
+        backend.lock = asyncio.Lock()
+        backend.types = {'emoji': NS(Request=lambda: NS())}
+        backend._call = AsyncMock(return_value=None)
+        results = await backend.dispatch('happy', None, lambda: True)
+        self.assertEqual(results[0]['status'], 'unknown')
+        self.assertEqual(results[0]['reason'], 'service_unavailable_or_response_timeout')
+        backend._call.assert_awaited_once()
+
     async def test_ros_wait_does_not_block_speech_and_duplicate_plans_are_not_queued(self):
         agent = object.__new__(DoubaoAgent)
         agent.presentation_backend = Mock()
