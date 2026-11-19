@@ -116,3 +116,12 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 421ms仅是这一轮表情协调等待，不是端到端语音延迟。此样本证明有空闲窗口时的协调路径可用，不代表所有网络/噪声条件下均成功或完全同步；本轮未提供全链路计时、食堂新增记录数或动作结果，不补记未测项目。肢体动作仍未开启及验收；第三版标签不移动。
 
 下一步先只读查询GetMcAction实际响应，并由现场人员核对稳定站立准备条件，再考虑单个挥手动作。程序不自动从零力矩切换运动模式。
+
+
+## 单次右手挥手测试：无响应、无可见动作
+
+只读GetMcAction先返回PASSIVE_DEFAULT/status100，用户调整后再次查询返回code0、STAND_DEFAULT/status100；因此此次确有稳定站立模式响应证据，不能把status100单独解读为稳定站立。
+
+随后操作者单次执行 timeout 10s ros2 service call /aimdk_5Fmsgs/srv/SetMcPresetMotion aimdk_msgs/srv/SetMcPresetMotion 请求：area.value2、motion.value1002、interrupt=false、play_timestamp0；请求头时间戳保持默认0。终端显示requester: making request后返回提示符，未出现response；用户观察机器人没有任何反应。未采集该命令退出码，不将其记为明确拒绝、受理或完成。测试尚未通过，不能仅凭服务在ROS图中存在就断定服务链路可用。
+
+目前不重复发送，不自动改运动模式、原生模块或SDK。下一步只读复核GetMcAction当前响应及运动/桥接服务节点，确认查询链路和动作服务提供方后再定位。表情与语音既有验收不变，肢体动作对话开关继续关闭。

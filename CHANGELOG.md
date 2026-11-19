@@ -2,6 +2,11 @@
 
 每个版本都对应Git标签；“实测通过”只指下列范围，不代表全部赛事功能完成。
 
+## 右手挥手单项排查 — 2026-11-19
+
+- GetMcAction实测从PASSIVE_DEFAULT变为STAND_DEFAULT/status100；单次右挥手请求仅显示making request，无response，用户观察无动作，尚未通过动作验收。
+- 请求结果未明，不重发、不改原生SDK或运动模式；下一步只读核对服务链路。
+
 ## 表情优先级协调（首轮真机联动通过）— 2026-11-19
 
 - 实测状态显示priority60为adore/thinking单次表情，期间回到priority0；具体调用者未确认。
