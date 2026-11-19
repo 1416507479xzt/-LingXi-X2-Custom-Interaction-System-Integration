@@ -20,6 +20,8 @@ python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
 
 构建需要开发电脑联网下载锁定版本的 Linux aarch64 / CPython 3.10 Python 依赖。生成的 ZIP 位于 `dist/`，不会提交到 Git。真机运行云端 ASR、LLM、TTS 仍需要联网；API Key 在机器人运行时单独提供，不在源码仓库或部署包中。
 
+**开发位置：本项目二开程序在 PC2 开发和运行，PC1 不作为二开环境；不要求为本项目登录 PC1 或修改、停止其运控模块。** PC3 仅按下文已验证流程重启原生交互 agent。
+
 机器人 Wi-Fi IP 会随网络变化。部署时从机器人信息页面确认当前 IP，并在 PowerShell 中输入；源码和启动配置不预设历史 IP。
 
 ## 当前验证状态
