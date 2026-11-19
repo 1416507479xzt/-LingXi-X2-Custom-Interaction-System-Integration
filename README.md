@@ -42,11 +42,11 @@
 
 **二开程序在PC2运行，不进入PC1开发，也不修改或重启PC1运控。** PC2与PC3都可能显示 `agi@agi`，只看提示符无法区分。SSH的 `exit` 每次只返回上一层。
 
-Wi-Fi IP每次从机器人信息页核对。视频中的旧地址仅为当时现场地址，不写成日常固定值。`10.0.1.42`是这台机器人已核对的PC3机内地址；其他机器需要重新核对内部拓扑，不能用它替代Wi-Fi地址。
+Wi-Fi IP每次从机器人信息页核对，不沿用历史地址。`10.0.1.42`是这台机器人已核对的PC3机内地址；其他机器需要重新核对内部拓扑，不能用它替代Wi-Fi地址。
 
 ## 首次部署与更新离线包
 
-录屏开始时项目、依赖和私有配置已经部署，**视频没有演示这一节**。这里补齐新电脑复现所需步骤；同一版本日常使用无需重新打包、上传或解压。
+新电脑或首次部署时完成本节；同一版本日常使用无需重新打包、上传或解压。
 
 ### A. 电脑PowerShell：取得当前源码并构建
 
@@ -107,9 +107,9 @@ Key由Agent自动读取，后续不用反复粘贴。现有环境变量优先于
 
 ## 每次启动自研交互与查看食堂反馈
 
-以下按 **《浙江数智大赛电脑屏幕.mp4》约4分45秒录屏**整理。视频证据定位见[时间轴与异常记录](docs/zh-CN/2026-11-19-screen-recording-walkthrough.md)。命令结合当前源码核对，动态地址与日志编号由运行时生成，不照抄视频旧值。
+按以下顺序连接机器人、切换模式、启动自研交互并查看反馈表。动态地址与日志编号由运行时生成。
 
-### 1. 电脑PowerShell：SSH登录PC2（视频00:00–00:20）
+### 1. 电脑PowerShell：SSH登录PC2
 
 ```powershell
 $RobotIp = (Read-Host '输入机器人当前 Wi-Fi IP').Trim()
@@ -121,7 +121,7 @@ ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "agi@${RobotIp}"
 
 <a id="原生交互模块切换重启与恢复"></a>
 
-### 2. PC2 SSH：切换only_voice（视频约00:20–00:35）
+### 2. PC2 SSH：切换only_voice
 
 先停止旧自研Agent和诊断脚本。若本次已经完成模式设置、原生agent重启和实际行为确认，可直接跳到第5步。新开机或状态不确定时重新核对。
 
@@ -132,7 +132,7 @@ ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/Set
 
 等服务返回 `response` 再继续。手头机器可返回 `code=0/status.value=0 (UNKNOWN)`，不能单凭此响应宣称切换成功。`only_voice`用于保留自研接入需要的原生语音链路，暂停原生大模型问答；不是把整个原生agent永远关掉。
 
-### 3. PC2进入PC3，逐条重启原生agent（视频约00:35–01:10）
+### 3. PC2进入PC3，逐条重启原生agent
 
 本机已核对的PC3地址：
 
@@ -160,15 +160,15 @@ exit
 
 返回PC2。不要把两条aima命令当成PC2命令；不要用 `stop-all` 或修改运控模块。
 
-**视频中的异常要与标准流程区分：**约01:00，启动命令实际返回 `500 Server Error` 和 `Process "agent" already running`。视频随后退出并运行了自研Agent，但没有展示该异常的处理和原生模式行为核对；不能将其记为重启成功。遇到此类错误先保留输出，核查PC3应用状态，例如只读执行 `aima em get-app agent`，结合现场行为判断；不盲目重复重启、不杀进程。此前成功的模式恢复记录见[11月8日联调](docs/zh-CN/2026-11-08-x2-real-robot-integration.md)。
+若启动返回 `500 Server Error` 或 `Process "agent" already running`，先保留输出，通过 `aima em get-app agent` 只读核查PC3应用状态，结合现场行为判断；不将报错视为启动成功，不盲目重复重启或杀进程。
 
-### 4. PC2：确认实际模式（补充验收步骤）
+### 4. PC2：确认实际模式
 
-先不启动自研Agent，用原生唤醒词问“现在几点”，确认原生大模型不再回答，并结合原生agent启动结果和已验证的收音链路核对。仅仅没有声音不能证明模式成功。此检查没有在本段录屏中单独展示。
+先不启动自研Agent，用原生唤醒词问“现在几点”，确认原生大模型不再回答，并结合原生agent启动结果和已验证的收音链路核对。仅仅没有声音不能证明模式成功。
 
 需要动作时由操作者通过原生控制方式让机器人稳定站立，并留出动作空间。程序不会自动从零力矩切换成站立。
 
-### 5. PC2 SSH：启动自研语音、表情和动作（视频约01:10–01:30）
+### 5. PC2 SSH：启动自研语音、表情和动作
 
 ```bash
 cd /home/agi/eldercare-x2/eldercare_x2
@@ -180,7 +180,7 @@ export X2_ONLY_VOICE_CONFIRMED=1
 python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --competition-mode --health-semantic model --llm-model doubao-seed-2-0-mini-260428 --presentation-backend aimdk --enable-robot-presentation --enable-robot-motion --vad-idle-seconds 1.5 --aimdk-streaming-asr --dining-feedback-records data/dining_feedback.jsonl --log-file "logs/autonomy_${SESSION_ID}.log" --metrics-file "logs/autonomy_${SESSION_ID}_metrics.json"
 ```
 
-保持这个窗口运行，等预检通过并显示等待唤醒/会话就绪，再说“你好灵犀”，等它询问状态后回答。录屏约01:30–04:20显示ASR、模型回答、TTS及表现服务日志；声音和物理动作是否完成仍需现场观察。
+保持这个窗口运行，等预检通过并显示等待唤醒/会话就绪，再说“你好灵犀”，等它询问状态后回答。终端会显示ASR、模型回答、TTS及表现服务日志；声音和物理动作是否完成需现场观察。
 
 | 参数/命令 | 用途 |
 |---|---|
@@ -194,7 +194,7 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 
 日志落在机器人项目 `logs/` 内，不是录音文件。开发测试建议保留；若只需日常演示，可从启动命令删去 `--log-file`、`--metrics-file`及各自紧随的路径，终端仍显示信息，食堂保存不受影响。
 
-### 6. 电脑另开PowerShell：打开食堂反馈表（视频约04:20–04:45）
+### 6. 电脑另开PowerShell：打开食堂反馈表
 
 不要关闭运行Agent的SSH窗口，也不要在机器人终端输入Windows路径。电脑仓库根目录执行：
 
@@ -202,17 +202,17 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 .\open_dining_dashboard.cmd
 ```
 
-视频使用的是从任意PowerShell目录调用本机完整路径的方式：
+也可从任意PowerShell目录使用本机完整路径：
 
 ```powershell
 & 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
 ```
 
-其他电脑使用实际克隆目录。按提示输入当前Wi-Fi IP，并在新SSH窗口自行输入密码，连通后浏览器自动打开。默认从本地18765–18775中选择可用端口，视频页面为 `http://127.0.0.1:18765/`；以脚本实际打印的地址为准，保留网页SSH连接窗口。
+其他电脑使用实际克隆目录。按提示输入当前Wi-Fi IP，并在新SSH窗口自行输入密码，连通后浏览器自动打开。默认从本地18765–18775中选择可用端口，例如 `http://127.0.0.1:18765/`；以脚本实际打印的地址为准，保留网页SSH连接窗口。
 
 **网页只负责查看，Agent负责保存。** 对机器人说食堂意见，等复述后明确确认，Agent才写入机器人上的 `data/dining_feedback.jsonl`。不开网页、关闭网页都不影响运行中的Agent保存；以后打开网页可查看历史记录。网页的 `new` 是记录状态，不代表已实际提交给食堂工作人员。
 
-### 7. 测试与停止（停止步骤为补充，视频未展示）
+### 7. 测试与停止
 
 观察语音是否完整、表情是否可见、动作是否完整收回且站立稳定。可依次测试“今天感觉不错”“今天有什么注意事项”，以及挥手、间隔至少8秒后双手比心；再完成一条食堂反馈确认并核对网页。
 
@@ -286,7 +286,6 @@ exit
 |---|---|
 | 首次部署、接口探针与兼容性 | [复现指南（v0.3.0语音基线）](docs/zh-CN/reproduce-on-x2.md)、[现场部署选择](docs/zh-CN/onsite-deployment.md)；当前完整联动按本README |
 | 29项动作及表情 | [自主表现目录](docs/zh-CN/autonomous-presentation.md)、[11月19日联调](docs/zh-CN/2026-11-19-presentation-integration.md) |
-| 本轮录屏整理 | [时间轴与异常记录](docs/zh-CN/2026-11-19-screen-recording-walkthrough.md) |
 | 食堂意见与网页 | [食堂反馈步骤](docs/zh-CN/stage4-dining-feedback.md) |
 | 语音对照与历史问题 | [语音验收](docs/zh-CN/voice-dialogue-acceptance.md)、[ASR诊断](docs/zh-CN/2026-11-18-x2-asr-diagnosis.md)、[播音与保存路径](docs/zh-CN/2026-11-18-playback-and-feedback-path.md) |
 | 模型比较与版本 | [四模型记录](docs/zh-CN/model-evaluation/2026-11-08/赛事评分对比.md)、[版本管理](docs/zh-CN/version-management.md)、[CHANGELOG](CHANGELOG.md) |
