@@ -4,6 +4,17 @@
 
 当前版本：**[v0.3.0（第三版）](docs/zh-CN/releases/v0.3.0.md)**。源码版本见 VERSION；与第二版的变化见[版本对比](https://github.com/1416507479xzt/-X2-/compare/v0.2.0...v0.3.0)。
 
+## 演示视频
+
+2026-11-19现场演示，分别记录电脑屏幕操作与机器人实机。点击预览图或下方链接进入视频文件页面播放；如果浏览器未显示播放器，可使用文件页面的下载入口观看。两段视频分别展示现场过程，不作为全部功能或全部动作验收证明。
+
+| 电脑屏幕录制（约4分45秒） | 机器人实机（约2分51秒） |
+|---|---|
+| [![电脑屏幕演示预览](docs/media/x2-desktop-preview.jpg)](docs/media/x2-desktop-demo.mp4) | [![机器人实机演示预览](docs/media/x2-robot-preview.jpg)](docs/media/x2-robot-demo.mp4) |
+| [播放／下载电脑屏幕视频](docs/media/x2-desktop-demo.mp4) | [播放／下载机器人实机视频](docs/media/x2-robot-demo.mp4) |
+
+电脑录屏为适合仓库分发的H.264压缩副本，保留原分辨率、完整时长和声音；实机视频保留原文件。开发电脑上的两份原视频没有修改。视频仅用于项目展示，不包含在机器人运行所需的离线部署包中。
+
 ## 从另一台电脑开始
 
 版本节点、比较和旧版复测见[版本管理说明](docs/zh-CN/version-management.md)及[CHANGELOG](CHANGELOG.md)。ARM64 Docker候选镜像已通过云端构建、依赖检查及56项离线测试；下载和验证范围见[首次容器构建记录](docs/zh-CN/2026-11-18-container-build.md)及[容器复现说明](docs/zh-CN/docker-reproduction.md)。尚未完成容器真机验收，当前真机ZIP方案继续保留。
