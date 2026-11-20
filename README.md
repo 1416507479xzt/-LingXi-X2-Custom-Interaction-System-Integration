@@ -47,7 +47,7 @@
 
 **二开程序在PC2运行，不进入PC1开发，也不修改或重启PC1运控。** PC2与PC3都可能显示 `agi@agi`，只看提示符无法区分。SSH的 `exit` 每次只返回上一层。
 
-Wi-Fi IP每次从机器人信息页核对，不沿用历史地址。`10.0.1.42`是这台机器人已核对的PC3机内地址；其他机器需要重新核对内部拓扑，不能用它替代Wi-Fi地址。
+PC2的Wi-Fi IP会随网络变化，每次从机器人信息页确认。PC3使用固定机内地址 `10.0.1.42`，不随PC2的Wi-Fi IP变化；从PC2连接PC3时直接使用下面的固定命令。
 
 ## 首次部署与更新离线包
 
@@ -144,11 +144,10 @@ ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/Set
 
 ### 3. PC2进入PC3，逐条重启原生agent
 
-输入已由设备方或现场核对的PC3机内地址（手头机器人曾核对为10.0.1.42）：
+从PC2连接固定地址的PC3：
 
 ```bash
-read -r -p '已核对的PC3机内IP: ' PC3_IP
-[ -n "$PC3_IP" ] && ssh "agi@$PC3_IP"
+ssh agi@10.0.1.42
 ```
 
 输入密码并核对SoC2横幅后，在PC3执行：
@@ -243,8 +242,7 @@ ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/Set
 等返回响应，仍在PC2执行：
 
 ```bash
-read -r -p '已核对的PC3机内IP: ' PC3_IP
-[ -n "$PC3_IP" ] && ssh "agi@$PC3_IP"
+ssh agi@10.0.1.42
 ```
 
 进入已核对的PC3后，逐条执行、每步确认成功再继续：

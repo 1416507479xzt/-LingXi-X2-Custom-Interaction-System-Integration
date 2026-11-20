@@ -5,7 +5,7 @@
 ## 1. 交付前提
 
 - 目标为兼容的X2 Ultra，PC2允许SSH、文件传输及运行二开程序；Linux aarch64、Python3.10，已有匹配的AimDK v1.0.0、ROS2及消息包。
-- 允许切换/恢复原生交互；确认PC3内部地址和原生agent位置。手头机器为10.0.1.42，其他机器人重新核对，不盲用旧地址。
+- 允许切换/恢复原生交互；原生agent在PC3，固定机内地址为 `10.0.1.42`，从PC2连接。PC2的Wi-Fi IP随网络变化，需要每次确认。
 - 机器人运行时能够访问豆包语音与方舟；自备已开通服务和Mini权限的两把Key。离线指免去下载Python依赖，语音及模型调用仍需联网。
 - 新电脑可用Windows PowerShell及OpenSSH的ssh/scp；只复制现成交付包时不用安装Docker或Python。需要修改、重建源码时再安装Git/Python。
 
