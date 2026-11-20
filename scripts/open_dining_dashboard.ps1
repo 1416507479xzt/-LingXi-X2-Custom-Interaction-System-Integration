@@ -1,5 +1,6 @@
 ﻿param(
     [string]$RobotIp,
+    [string]$ProjectDir,
     [int]$Port = 0,
     [ValidateSet('data/dining_feedback.jsonl','data/dining_feedback_stage4_test.jsonl')]
     [string]$RecordsPath = 'data/dining_feedback.jsonl',
@@ -55,10 +56,19 @@ if ($Port -eq 0) {
 }
 if ($Port -lt 1024 -or $Port -gt 65535) { throw '没有可用的网页端口。' }
 $url = "http://127.0.0.1:${Port}/"
-$remoteCommand = "cd /home/agi/eldercare-x2/eldercare_x2 && python3 -u feedback_dashboard.py --records $RecordsPath --port $Port"
+$locatorPath = Join-Path $PSScriptRoot 'robot_project.py'
+$remoteCommand = ''
 if ($Container) {
+    if ($ProjectDir) { throw '容器入口不使用ZIP部署目录。' }
     if ($RecordsPath -ne 'data/dining_feedback.jsonl') { throw '容器网页使用交付目录state/dining_feedback.jsonl，不接受ZIP记录路径。' }
     $remoteCommand = "cd /home/agi/eldercare-container && bash run.sh dashboard --port $Port"
+} else {
+    $sourceBase64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($locatorPath))
+    $remoteCommand = "python3 -u -c `"import base64;exec(compile(base64.b64decode('$sourceBase64'),'robot_project.py','exec'))`" --records $RecordsPath --port $Port"
+    if ($ProjectDir) {
+        $directoryBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($ProjectDir))
+        $remoteCommand += " --project-dir-b64 $directoryBase64"
+    }
 }
 
 if ($CheckOnly) {
@@ -86,6 +96,7 @@ $childArguments = @(
     '-SshSession', '-RobotIp', $RobotIp, '-Port', $Port, '-RecordsPath', $RecordsPath
 )
 if ($Container) { $childArguments += '-Container' }
+if ($ProjectDir) { $childArguments += @('-ProjectDir', ('"' + $ProjectDir + '"')) }
 $process = Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -PassThru -ArgumentList $childArguments
 for ($attempt = 0; $attempt -lt 90; $attempt++) {
     if (Test-FeedbackPage $Port) {

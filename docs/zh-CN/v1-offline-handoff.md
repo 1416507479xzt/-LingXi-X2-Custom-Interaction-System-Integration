@@ -18,6 +18,7 @@ x2_v1_handoff/
   eldercare_x2_aarch64_py310.zip
   open_dining_dashboard.cmd
   scripts/open_dining_dashboard.ps1
+  scripts/robot_project.py
   .env.example
   START-HERE.md
   source-commit.txt
@@ -76,7 +77,7 @@ PC2执行 `chmod 600 /home/agi/eldercare-x2/eldercare_x2/.env`。Agent和语音�
 .\open_dining_dashboard.cmd
 ```
 
-输入当前IP，在新SSH窗口自行输入密码并保留窗口。这里使用ZIP部署入口，不使用open_container_feedback.cmd。网页与Agent读取同一机器人项目下的data/dining_feedback.jsonl。保存由Agent在用户明确确认后完成，不打开网页也可记录；网页不会替代运行中的Agent。
+输入当前IP，在新SSH窗口自行输入密码并保留窗口。这里使用ZIP部署入口，不使用open_container_feedback.cmd。网页自动查找用户目录下一层的ZIP部署，兼容带提交号的部署目录；多套部署时提示选择与当前Agent相同的目录，不扫描隔离备份。网页与Agent读取同一机器人项目下的data/dining_feedback.jsonl。保存由Agent在用户明确确认后完成，不打开网页也可记录；网页不会替代运行中的Agent。
 
 ## 7. 逐项验收，再宣布复现
 

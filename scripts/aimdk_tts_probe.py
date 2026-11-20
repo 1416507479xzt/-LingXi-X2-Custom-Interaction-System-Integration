@@ -79,8 +79,8 @@ def main(argv=None):
     parser.add_argument("--env-file", help="本地密钥配置路径；默认项目根目录 .env")
     parser.add_argument("--play", action="store_true",
                         help="向机器人扬声器播放；必须先确认 only_voice 生效")
-    parser.add_argument("--focus-priority", type=int, choices=(4, 5, 6), default=4,
-                        help="探针音频焦点优先级，允许 4/5/6；默认 4")
+    parser.add_argument("--focus-priority", type=int, choices=(4, 5, 6), default=6,
+                        help="探针音频焦点优先级，允许 4/5/6；默认 6，与主Agent一致")
     parser.add_argument("--speaker")
     args = parser.parse_args(argv)
     load_env(args.env_file)

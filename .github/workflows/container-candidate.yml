@@ -83,7 +83,7 @@ jobs:
               tests.test_medicine_consultation tests.test_medicine_output_guard tests.test_life_assistance \
               tests.test_demo_reminder_configuration tests.test_dining_feedback tests.test_feedback_dashboard \
               tests.test_aimdk_playback tests.test_dining_cli_path tests.test_observed_dialogue_followup \
-              tests.test_container_delivery -q
+              tests.test_container_delivery tests.test_reproduction_portability -q
 
       - name: Validate Compose definition
         run: |

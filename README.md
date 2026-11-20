@@ -35,6 +35,8 @@
 
 尚未逐项验证的27个动作、长时间运行、不同网络/噪声、赛方统一机器人的兼容性及容器真机运行，不能由本轮反馈推定通过。没有新的完整延迟统计，不声称稳定低于2秒。到点主动提醒已排除在开发范围外。
 
+另一台电脑在同一机器人上的复现已验证语音、连续对话、表情和已测动作；不等于第二台机器已验收。该轮的网页、食堂保存闭环及退出恢复仍缺验收记录；[差异与通用化处理](docs/zh-CN/2026-11-21-reproduction-portability.md)。
+
 ## 执行窗口与设备
 
 | 位置 | 用来做什么 | 如何识别 |
@@ -58,11 +60,14 @@ Wi-Fi IP每次从机器人信息页核对，不沿用历史地址。`10.0.1.42`�
 安装Git及Python 3.10或更新版本，在PowerShell执行：
 
 ```powershell
-git clone https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration.git
+git clone --depth 1 --filter=blob:none --sparse https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration.git
 Set-Location .\-LingXi-X2-Custom-Interaction-System-Integration
-python scripts/build_robot_bundle.py --download-wheels
-python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
+git sparse-checkout set x2_agent scripts data tests docker .github docs/zh-CN docs/en docs/fr
+python scripts/build_v1_handoff.py --download-wheels
+python -m zipfile -t .\dist\x2_v1_handoff\eldercare_x2_aarch64_py310.zip
 ```
+
+轻量克隆保留部署所需源码与文档，不下载演示视频和完整历史；需要视频时另行执行 `git sparse-checkout add docs/media`。构建会生成完整交付目录 `dist/x2_v1_handoff/`，其中包含ZIP、网页工具及校验清单。只复现、不开发的新电脑可直接接收该目录，跳过Git、Python与pip构建。
 
 现有仓库在确认本地修改已保存后更新main，再构建即可。构建在电脑上下载锁定的Linux aarch64/Python3.10依赖，机器人无需pip安装；运行云端ASR/LLM/TTS仍需要网络。容器是候选方案，当前实机流程使用ZIP，见[容器说明](docs/zh-CN/docker-reproduction.md)。
 
@@ -74,7 +79,7 @@ python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
 $RobotIp = (Read-Host '输入机器人当前 Wi-Fi IP').Trim()
 if ([string]::IsNullOrWhiteSpace($RobotIp)) { throw '机器人 IP 不能为空' }
 ssh "agi@${RobotIp}" 'mkdir -p /home/agi/eldercare-x2'
-scp -O .\dist\eldercare_x2_aarch64_py310.zip "agi@${RobotIp}:/home/agi/eldercare-x2/"
+scp -O .\dist\x2_v1_handoff\eldercare_x2_aarch64_py310.zip "agi@${RobotIp}:/home/agi/eldercare-x2/"
 ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "agi@${RobotIp}"
 ```
 
@@ -139,10 +144,11 @@ ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/Set
 
 ### 3. PC2进入PC3，逐条重启原生agent
 
-本机已核对的PC3地址：
+输入已由设备方或现场核对的PC3机内地址（手头机器人曾核对为10.0.1.42）：
 
 ```bash
-ssh agi@10.0.1.42
+read -r -p '已核对的PC3机内IP: ' PC3_IP
+[ -n "$PC3_IP" ] && ssh "agi@$PC3_IP"
 ```
 
 输入密码并核对SoC2横幅后，在PC3执行：
@@ -207,13 +213,9 @@ python3 scripts/run_robot_agent.py --transport aimdk --enable-robot-audio --comp
 .\open_dining_dashboard.cmd
 ```
 
-也可从任意PowerShell目录使用本机完整路径：
+使用现成交付包时，在电脑的 `x2_v1_handoff` 目录执行同一条命令。网页会自动查找机器人上的ZIP部署，兼容 `eldercare-x2` 和带提交号的目录；多套部署同时存在时，在新SSH窗口选择与本次Agent相同的目录，不会自动读取隔离备份。无需修改脚本中的路径。
 
-```powershell
-& 'C:\Users\LENOVO\Desktop\2026浙江省数智【具身智能应用实践赛道】文件\智慧养老\智慧养老_参赛源码\open_dining_dashboard.cmd'
-```
-
-其他电脑使用实际克隆目录。按提示输入当前Wi-Fi IP，并在新SSH窗口自行输入密码，连通后浏览器自动打开。默认从本地18765–18775中选择可用端口，例如 `http://127.0.0.1:18765/`；以脚本实际打印的地址为准，保留网页SSH连接窗口。
+按提示输入当前Wi-Fi IP，并在新SSH窗口自行输入密码，连通后浏览器自动打开。默认从本地18765–18775中选择可用端口，例如 `http://127.0.0.1:18765/`；以脚本实际打印的地址为准，保留网页SSH连接窗口。
 
 **网页只负责查看，Agent负责保存。** 对机器人说食堂意见，等复述后明确确认，Agent才写入机器人上的 `data/dining_feedback.jsonl`。不开网页、关闭网页都不影响运行中的Agent保存；以后打开网页可查看历史记录。网页的 `new` 是记录状态，不代表已实际提交给食堂工作人员。
 
@@ -241,7 +243,8 @@ ros2 service call /aimdk_5Fmsgs/srv/SetAgentPropertiesRequest aimdk_msgs/srv/Set
 等返回响应，仍在PC2执行：
 
 ```bash
-ssh agi@10.0.1.42
+read -r -p '已核对的PC3机内IP: ' PC3_IP
+[ -n "$PC3_IP" ] && ssh "agi@$PC3_IP"
 ```
 
 进入已核对的PC3后，逐条执行、每步确认成功再继续：

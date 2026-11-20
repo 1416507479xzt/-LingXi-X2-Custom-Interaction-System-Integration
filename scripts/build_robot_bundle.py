@@ -85,6 +85,7 @@ def build(wheelhouse, output):
                    ROOT / "CHANGELOG.md", ROOT / "open_dining_dashboard.cmd",
                    ROOT / "docs" / "zh-CN" / "model-evaluation" / "2026-11-19" / "presentation_autonomy.json",
                    ROOT / "scripts" / "open_dining_dashboard.ps1",
+                   ROOT / "scripts" / "robot_project.py",
                    ROOT / "scripts" / "aimdk_mic_probe.py",
                    ROOT / "scripts" / "aimdk_asr_probe.py",
                    ROOT / "scripts" / "aimdk_asr_diagnostic.py",

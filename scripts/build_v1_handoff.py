@@ -27,6 +27,7 @@ def build(output, wheelhouse):
     copies = {
         'open_dining_dashboard.cmd': ROOT / 'open_dining_dashboard.cmd',
         'scripts/open_dining_dashboard.ps1': ROOT / 'scripts/open_dining_dashboard.ps1',
+        'scripts/robot_project.py': ROOT / 'scripts/robot_project.py',
         '.env.example': ROOT / '.env.example',
         'START-HERE.md': ROOT / 'docs/zh-CN/v1-offline-handoff.md',
     }
