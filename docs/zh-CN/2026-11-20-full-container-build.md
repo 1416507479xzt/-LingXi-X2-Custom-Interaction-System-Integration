@@ -45,3 +45,11 @@ full-agent以当前已实测ZIP参数启动语音、Mini、表情、动作、流
 因此当前PC2不能直接load/run镜像。masked是明确禁用状态，不能简单当作没有安装；不通过unmask、启动系统Docker或复用正在运行的原生containerd绕过限制，不进入PC1。尚不能确认由哪个组件设置禁用，需设备提供方核对官方允许的Podman/容器开发方案及与当前固件的兼容性，再进行容器真机验收。
 
 本次没有修改机器人服务或容器权限。当前用户UID显示为1001，run.sh按实际UID/GID映射；Compose的固定镜像用户默认1000，目标机器如不同应优先使用运行器并核对目录权限，不能直接把云端默认用户当作机载用户。
+
+## 官方版本说明确认
+
+随后核对[官方版本更新记录](https://x2-aimdk.agibot.com/zh-cn/latest/changelog.html#changelog-v1-0-0)：v1.0.0引入的是独立agi rootfs文件系统隔离沙盒，限制明确包含暂不支持docker、systemd仅支持用户级服务。这不能等同于开放Docker/Podman容器二开，不能因docker客户端存在就尝试启动系统服务。
+
+同一更新记录将基于Podman的容器化开发列为v1.1.0新增功能；[官方容器章节](https://x2-aimdk.agibot.com/zh-cn/latest/quick_start/container_dev.html)说明v1.1.0是两种模式并存的过渡版本，v1.2.0起要求在容器内构建和运行。当前机器的SDK v1.0.0、Podman缺失及Docker masked现状，与旧开发环境尚未开放该路径相符；不将服务禁用的具体设置者作进一步推断。
+
+如需在这台机器落地容器镜像，应由设备方确认支持的系统/固件及SDK配套升级或容器环境开通方案。仅替换SDK目录不能保证获得Podman、用户映射和设备挂载权限。升级后还要重新核对音频、表情和动作接口并完成实机回归；升级前继续使用已验收ZIP流程，不自行unmask Docker。

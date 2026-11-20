@@ -293,6 +293,8 @@ exit
 
 2026-11-20本机只读核对：PC2没有Podman，Docker客户端存在但系统服务被masked，不能直接导入运行。需设备方确认并提供获准容器环境；不自行解除禁用或重启当前运行的containerd。[查询结果及本地交付位置](docs/zh-CN/2026-11-20-full-container-build.md#本机交付与pc2只读核对)。
 
+官方版本说明：v1.0.0的文件系统隔离沙盒暂不支持Docker；v1.1.0新增Podman容器开发，v1.2.0起要求容器内开发。当前机器如要使用镜像，需要设备方确认配套系统/固件及SDK环境，不能只换SDK或解除服务禁用。[官方更新记录](https://x2-aimdk.agibot.com/zh-cn/latest/changelog.html)。
+
 ## 代码与开发文档
 
 | 主题 | 入口 |

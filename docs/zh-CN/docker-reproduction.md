@@ -8,6 +8,8 @@
 
 应用镜像默认基于ROS Humble/Ubuntu22.04，目标ARM64/Python3.10。设备固件、原生SDK及动态库、容器权限和DDS通信仍来自获准的目标环境。机器人自己的SDK预编译产物是否兼容容器，要通过预检和实测确认；不是任意机器人导入就可运行。
 
+[官方v1.0.0更新说明](https://x2-aimdk.agibot.com/zh-cn/latest/changelog.html#changelog-v1-0-0)明确：该版本的agi rootfs隔离沙盒暂不支持docker，systemd仅支持用户级服务。v1.1.0才新增Podman容器化开发。当前机器不能通过简单启动或unmask系统Docker获得官方支持；须先由设备方确认配套环境，不能只替换SDK包。
+
 ## 后续优化如何进入镜像
 
 - main的x2_agent、scripts、公开data、tests、入口、skills、锁定依赖和容器配置改变时自动触发[ARM64应用镜像工作流](../../.github/workflows/container-candidate.yml)，也可手动触发。
