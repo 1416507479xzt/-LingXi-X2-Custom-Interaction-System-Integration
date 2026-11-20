@@ -23,3 +23,25 @@ full-agent以当前已实测ZIP参数启动语音、Mini、表情、动作、流
 按[官方容器开发说明](https://x2-aimdk.agibot.com/zh-cn/latest/quick_start/container_dev.html)，目标X2 Ultra须具备获准Podman环境及设备SDK/ROS/DDS挂载；手头历史AimDK v1.0.0的运行器现状仍需只读核对。没有安装容器引擎、升级机器人、修改PC1或切换当前原生交互模式。
 
 在目标机器满足条件后，按[交付操作](../../docker/CONTAINER-QUICKSTART.md)导入、预检，再完成[容器验收清单](docker-reproduction.md#验收门槛)，才可标记“跨设备容器完整效果复现通过”。
+
+## 本机交付与PC2只读核对
+
+完整附件已下载并解压到开发电脑仓库 `dist/eldercare_container_1ba5790/`，ZIP CRC、交付包SHA256SUMS均通过；另核对了镜像归档内存在上述提交号标签。该目录包含镜像和运行文件，不包含下载分块、个人Key或实际反馈，适合后续获准时复制。生成的镜像文件不进入Git。
+
+用户在PC2回传的只读结果：
+
+| 项目 | 实际输出 |
+|---|---|
+| SDK | `aimdk v1.0.0-ga424add` |
+| Podman | command not found |
+| Docker客户端 | `/usr/bin/docker`，27.5.1（Ubuntu22.04构建） |
+| Docker上下文 | default，`unix:///var/run/docker.sock` |
+| Docker连接 | Cannot connect to the Docker daemon |
+| Docker服务 | LoadState=masked，ActiveState=inactive，UnitFileState=masked，FragmentPath=/etc/systemd/system/docker.service |
+| dockerd | `/usr/bin/dockerd`存在 |
+| containerd服务 | LoadState=loaded，ActiveState=active，UnitFileState=enabled |
+| socket | `/var/run/docker.sock`和当前用户`/run/user/1001/docker.sock`均不存在 |
+
+因此当前PC2不能直接load/run镜像。masked是明确禁用状态，不能简单当作没有安装；不通过unmask、启动系统Docker或复用正在运行的原生containerd绕过限制，不进入PC1。尚不能确认由哪个组件设置禁用，需设备提供方核对官方允许的Podman/容器开发方案及与当前固件的兼容性，再进行容器真机验收。
+
+本次没有修改机器人服务或容器权限。当前用户UID显示为1001，run.sh按实际UID/GID映射；Compose的固定镜像用户默认1000，目标机器如不同应优先使用运行器并核对目录权限，不能直接把云端默认用户当作机载用户。

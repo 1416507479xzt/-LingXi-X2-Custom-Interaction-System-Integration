@@ -291,6 +291,8 @@ exit
 
 **容器真机验收尚未完成，当前不要替换已验证的ZIP部署。** 官方路径使用Podman，适用范围与机载版本需要核对。[镜像交付和验证步骤](docs/zh-CN/docker-reproduction.md)、[随包操作指南](docker/CONTAINER-QUICKSTART.md)。
 
+2026-11-20本机只读核对：PC2没有Podman，Docker客户端存在但系统服务被masked，不能直接导入运行。需设备方确认并提供获准容器环境；不自行解除禁用或重启当前运行的containerd。[查询结果及本地交付位置](docs/zh-CN/2026-11-20-full-container-build.md#本机交付与pc2只读核对)。
+
 ## 代码与开发文档
 
 | 主题 | 入口 |
