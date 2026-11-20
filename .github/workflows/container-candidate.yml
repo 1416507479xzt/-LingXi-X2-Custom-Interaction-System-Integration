@@ -1,10 +1,20 @@
-name: ARM64 container candidate
+name: ARM64 application image
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
+      - x2_agent/**
+      - scripts/**
+      - data/**
+      - tests/**
+      - agent.py
+      - feedback_dashboard.py
+      - skills.yaml
+      - VERSION
+      - compose.yaml
+      - open_container_feedback.cmd
       - Dockerfile
       - requirements-lock.txt
       - .dockerignore
@@ -13,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: container-candidate-${{ github.ref }}
@@ -27,18 +38,29 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Select immutable image tag
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/eldercare-x2" >> "$GITHUB_ENV"
+
       - name: Build ARM64 candidate
         run: |
           docker build --platform linux/arm64 \
             --build-arg APP_VERSION=candidate-${GITHUB_SHA:0:12} \
             --build-arg VCS_REF="$GITHUB_SHA" \
-            -t eldercare-x2:candidate .
+            -t eldercare-x2:candidate -t "$IMAGE_NAME:sha-$GITHUB_SHA" .
 
       - name: Check image startup and bundled imports
         run: |
           docker run --rm eldercare-x2:candidate help
           test "$(docker image inspect eldercare-x2:candidate --format '{{.Architecture}}')" = arm64
           docker run --rm --network none eldercare-x2:candidate dependencies
+
+      - name: Verify every runtime source is from this commit
+        run: |
+          container=$(docker create eldercare-x2:candidate)
+          docker cp "$container:/opt/eldercare/source-manifest.json" /tmp/source-manifest.json
+          docker rm "$container"
+          python3 scripts/container_manifest.py --verify /tmp/source-manifest.json
 
       - name: Check default refuses missing robot SDK
         run: |
@@ -54,12 +76,22 @@ jobs:
             --mount "type=bind,src=$GITHUB_WORKSPACE/tests,dst=/opt/eldercare/tests,readonly" \
             --entrypoint /usr/bin/python3 eldercare-x2:candidate \
             -m unittest tests.test_aimdk_streaming tests.test_aimdk_transport \
-              tests.test_asr_streaming tests.test_dialogue_quality tests.test_reply_style -q
+              tests.test_asr_streaming tests.test_dialogue_quality tests.test_reply_style \
+              tests.test_documented_motion_catalog tests.test_motion_probe tests.test_motion_diagnostic \
+              tests.test_aimdk_expression_only tests.test_model_presentation tests.test_first_wake_greeting \
+              tests.test_dialogue_recovery tests.test_health_reminders tests.test_reminder_continuation \
+              tests.test_medicine_consultation tests.test_medicine_output_guard tests.test_life_assistance \
+              tests.test_demo_reminder_configuration tests.test_dining_feedback tests.test_feedback_dashboard \
+              tests.test_aimdk_playback tests.test_dining_cli_path tests.test_observed_dialogue_followup \
+              tests.test_container_delivery -q
 
       - name: Validate Compose definition
         run: |
           touch .env
           docker compose config --quiet
+          bash -n docker/entrypoint.sh docker/run.sh
+          docker run --rm --network none --entrypoint /bin/bash eldercare-x2:candidate \
+            -c 'source /opt/ros/humble/setup.bash; export PYTHONPATH=/opt/eldercare/vendor:/opt/eldercare; python3 agent.py --help'
 
       - name: Export candidate and source metadata
         run: |
@@ -67,9 +99,18 @@ jobs:
           docker image inspect eldercare-x2:candidate > image-artifact/image-inspect.json
           printf '%s\n' "$GITHUB_SHA" > image-artifact/source-commit.txt
           printf '%s\n' 'Build/import/offline tests only. Robot DDS, AimDK SDK and physical interaction NOT validated.' > image-artifact/VALIDATION.txt
-          docker save eldercare-x2:candidate | gzip -1 > image-artifact/eldercare-x2-arm64.tar.gz
+          docker save eldercare-x2:candidate "$IMAGE_NAME:sha-$GITHUB_SHA" | gzip -1 > image-artifact/eldercare-x2-arm64.tar.gz
+          cp docker/run.sh image-artifact/run.sh
+          cp .env.example image-artifact/.env.example
+          cp docker/CONTAINER-QUICKSTART.md image-artifact/README.md
+          cp /tmp/source-manifest.json image-artifact/source-manifest.json
+          cp compose.yaml image-artifact/compose.yaml
+          cp open_container_feedback.cmd image-artifact/open_container_feedback.cmd
+          mkdir -p image-artifact/scripts
+          cp scripts/open_dining_dashboard.ps1 image-artifact/scripts/
+          printf 'ELDERCARE_IMAGE=%s\n' "$IMAGE_NAME:sha-$GITHUB_SHA" > image-artifact/image.env
           cd image-artifact
-          sha256sum eldercare-x2-arm64.tar.gz > SHA256SUMS
+          sha256sum eldercare-x2-arm64.tar.gz run.sh source-manifest.json > SHA256SUMS
 
       - uses: actions/upload-artifact@v4
         with:
@@ -77,3 +118,14 @@ jobs:
           path: image-artifact/
           retention-days: 7
           compression-level: 0
+          include-hidden-files: true
+
+      - name: Publish checked image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE_NAME:sha-$GITHUB_SHA"
+          docker tag "$IMAGE_NAME:sha-$GITHUB_SHA" "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:latest"
+          docker image inspect "$IMAGE_NAME:sha-$GITHUB_SHA" --format '{{json .RepoDigests}}' >> "$GITHUB_STEP_SUMMARY"

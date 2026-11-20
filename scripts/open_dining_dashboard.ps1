@@ -4,6 +4,7 @@
     [ValidateSet('data/dining_feedback.jsonl','data/dining_feedback_stage4_test.jsonl')]
     [string]$RecordsPath = 'data/dining_feedback.jsonl',
     [switch]$SshSession,
+    [switch]$Container,
     [switch]$CheckOnly
 )
 
@@ -55,6 +56,10 @@ if ($Port -eq 0) {
 if ($Port -lt 1024 -or $Port -gt 65535) { throw '没有可用的网页端口。' }
 $url = "http://127.0.0.1:${Port}/"
 $remoteCommand = "cd /home/agi/eldercare-x2/eldercare_x2 && python3 -u feedback_dashboard.py --records $RecordsPath --port $Port"
+if ($Container) {
+    if ($RecordsPath -ne 'data/dining_feedback.jsonl') { throw '容器网页使用交付目录state/dining_feedback.jsonl，不接受ZIP记录路径。' }
+    $remoteCommand = "cd /home/agi/eldercare-container && bash run.sh dashboard --port $Port"
+}
 
 if ($CheckOnly) {
     [pscustomobject]@{RobotIp=$RobotIp; BrowserUrl=$url; Records=$RecordsPath; RemoteCommand=$remoteCommand}
@@ -76,10 +81,12 @@ if ($SshSession) {
 
 Write-Host "将打开一个 SSH 窗口。请在新窗口确认主机信息并自行输入密码。"
 Write-Host "网页准备好后自动打开：$url"
-$process = Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -PassThru -ArgumentList @(
+$childArguments = @(
     '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"'),
     '-SshSession', '-RobotIp', $RobotIp, '-Port', $Port, '-RecordsPath', $RecordsPath
 )
+if ($Container) { $childArguments += '-Container' }
+$process = Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -PassThru -ArgumentList $childArguments
 for ($attempt = 0; $attempt -lt 90; $attempt++) {
     if (Test-FeedbackPage $Port) {
         Start-Process $url

@@ -19,14 +19,14 @@ RUN python3 -m pip install --no-cache-dir --only-binary=:all: \
       --target /opt/eldercare/vendor -r requirements-lock.txt
 COPY x2_agent/ ./x2_agent/
 COPY data/life_assistance.json data/medicine-education.json data/medicine-template.json ./data/
-COPY scripts/robot_preflight.py scripts/run_robot_agent.py \
-     scripts/aimdk_mic_probe.py scripts/aimdk_asr_probe.py \
-     scripts/aimdk_asr_diagnostic.py scripts/aimdk_tts_probe.py ./scripts/
-COPY agent.py feedback_dashboard.py skills.yaml LICENSE README.md ./
+COPY scripts/ ./scripts/
+COPY agent.py feedback_dashboard.py skills.yaml LICENSE README.md VERSION ./
 COPY docker/entrypoint.sh /usr/local/bin/eldercare-entrypoint
+COPY docker/ ./docker/
+RUN python3 scripts/container_manifest.py --write /opt/eldercare/source-manifest.json
 RUN sed -i 's/\r$//' /usr/local/bin/eldercare-entrypoint \
     && chmod 755 /usr/local/bin/eldercare-entrypoint \
-    && mkdir -p /var/lib/eldercare /tmp/eldercare-home \
+    && mkdir -p /var/lib/eldercare/logs /tmp/eldercare-home \
     && chown -R 1000:1000 /var/lib/eldercare /tmp/eldercare-home
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \

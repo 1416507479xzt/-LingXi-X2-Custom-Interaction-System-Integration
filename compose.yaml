@@ -29,5 +29,15 @@ services:
     # Run compatibility checks first; opt in to agent explicitly.
     command: ["preflight"]
     restart: "no"
+  interaction:
+    extends:
+      service: robot
+    profiles: [interaction]
+    command: [full-agent]
+  dashboard:
+    extends:
+      service: robot
+    profiles: [dashboard]
+    command: [dashboard, --port, "18765"]
 volumes:
   records:

@@ -280,6 +280,14 @@ exit
 电脑录屏为适合仓库分发的H.264压缩副本，保留原分辨率、完整时长和声音；实机视频保留原文件。开发电脑上的两份原视频没有修改。视频仅用于项目展示，不包含在机器人运行所需的离线部署包中。
 
 
+## 容器镜像交付
+
+当前全部应用运行代码已纳入ARM64镜像构建，完整入口覆盖语音、表情、动作与食堂反馈。后续运行源码或依赖更新自动构建新镜像，并以Git提交号标记、校验源码一致性；旧镜像不会自行包含未来优化。Actions提供可复制导入的镜像及启动交付包，成功发布的GHCR镜像支持提交号回滚。
+
+在官方允许的PC2容器环境中，交付目录运行 `bash run.sh load`、`bash run.sh preflight`；确认only_voice和稳定站立后运行 `X2_ONLY_VOICE_CONFIRMED=1 bash run.sh full-agent`。电脑查看网页使用 `open_container_feedback.cmd`，与ZIP部署的入口分开。Key、SDK/固件及DDS配置仍由目标设备提供。
+
+**容器真机验收尚未完成，当前不要替换已验证的ZIP部署。** 官方路径使用Podman，适用范围与机载版本需要核对。[镜像交付和验证步骤](docs/zh-CN/docker-reproduction.md)、[随包操作指南](docker/CONTAINER-QUICKSTART.md)。
+
 ## 代码与开发文档
 
 | 主题 | 入口 |

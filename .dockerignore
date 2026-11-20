@@ -7,6 +7,7 @@
 !skills.yaml
 !LICENSE
 !README.md
+!VERSION
 !.env.example
 !x2_agent/
 !x2_agent/*.py
@@ -15,6 +16,7 @@
 !data/medicine-education.json
 !data/medicine-template.json
 !scripts/
+!scripts/*.py
 !scripts/robot_preflight.py
 !scripts/run_robot_agent.py
 !scripts/aimdk_mic_probe.py
@@ -23,3 +25,4 @@
 !scripts/aimdk_tts_probe.py
 !docker/
 !docker/entrypoint.sh
+!docker/*.sh
