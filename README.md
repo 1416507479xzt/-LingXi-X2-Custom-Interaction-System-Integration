@@ -304,6 +304,7 @@ exit
 | 首次部署、接口探针与兼容性 | [复现指南（v0.3.0语音基线）](docs/zh-CN/reproduce-on-x2.md)、[现场部署选择](docs/zh-CN/onsite-deployment.md)；当前完整联动按本README |
 | 29项动作及表情 | [自主表现目录](docs/zh-CN/autonomous-presentation.md)、[11月19日联调](docs/zh-CN/2026-11-19-presentation-integration.md) |
 | 食堂意见与网页 | [食堂反馈步骤](docs/zh-CN/stage4-dining-feedback.md) |
+| PC2自研文件与磁盘占用 | [已核对的项目文件清单](docs/zh-CN/2026-11-20-pc2-project-inventory.md)，仅盘点自研目录，不修改原生代码 |
 | 语音对照与历史问题 | [语音验收](docs/zh-CN/voice-dialogue-acceptance.md)、[ASR诊断](docs/zh-CN/2026-11-18-x2-asr-diagnosis.md)、[播音与保存路径](docs/zh-CN/2026-11-18-playback-and-feedback-path.md) |
 | 模型比较与版本 | [四模型记录](docs/zh-CN/model-evaluation/2026-11-08/赛事评分对比.md)、[版本管理](docs/zh-CN/version-management.md)、[CHANGELOG](CHANGELOG.md) |
 | Docker候选 | [构建记录](docs/zh-CN/2026-11-18-container-build.md)、[容器复现](docs/zh-CN/docker-reproduction.md)，尚未真机验收 |
