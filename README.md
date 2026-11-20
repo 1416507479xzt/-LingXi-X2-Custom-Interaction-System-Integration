@@ -47,6 +47,8 @@ Wi-Fi IP每次从机器人信息页核对，不沿用历史地址。`10.0.1.42`�
 
 ## 首次部署与更新离线包
 
+**新电脑＋新v1.0.0机器人无需升级或Docker：**使用[固定ZIP交付与逐项验收](docs/zh-CN/v1-offline-handoff.md)。开发电脑执行 `python scripts/build_v1_handoff.py`，将生成的 `dist/x2_v1_handoff/` 整个文件夹交给新电脑；里面已有机器人程序/离线依赖、网页工具和说明，Key及目标机器人SDK单独准备。
+
 新电脑或首次部署时完成本节；同一版本日常使用无需重新打包、上传或解压。
 
 ### A. 电脑PowerShell：取得当前源码并构建
