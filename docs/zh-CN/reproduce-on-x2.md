@@ -12,8 +12,8 @@
 如果仓库仍为私有，先在新电脑上完成 GitHub 登录或配置具有读取权限的 Git 凭据。
 
 ```powershell
-git clone https://github.com/1416507479xzt/-X2-.git
-Set-Location .\-X2-
+git clone https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration.git
+Set-Location .\-LingXi-X2-Custom-Interaction-System-Integration
 git checkout --detach v0.3.0
 python -m pip --version
 python scripts/build_robot_bundle.py --download-wheels

@@ -3,10 +3,10 @@
 ## 已完成
 
 - 源码提交：`1ba57901e60c2ab03fb5176577f1f2fc0da55a8a`，包含此前全部语音、对话、表情、动作及食堂反馈优化。
-- [ARM64云端构建](https://github.com/1416507479xzt/-X2-/actions/runs/44667095940)全部步骤成功：镜像构建、启动/导入、逐文件源码摘要对照、缺SDK时退出22、234项离线回归、Compose及Bash语法、镜像导出、附件及GHCR发布。
+- [ARM64云端构建](https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration/actions/runs/44667095940)全部步骤成功：镜像构建、启动/导入、逐文件源码摘要对照、缺SDK时退出22、234项离线回归、Compose及Bash语法、镜像导出、附件及GHCR发布。
 - 镜像：`ghcr.io/1416507479xzt/eldercare-x2:sha-1ba57901e60c2ab03fb5176577f1f2fc0da55a8a`。
 - 本次成品digest：`sha256:a3732bf1df818b2b63009c1d31d564af196bd02850b304da9def906fb15fad60`；本轮发布时latest指向同一digest。日后latest会随成功构建变化，复现以提交号和digest为准。
-- [离线交付附件](https://github.com/1416507479xzt/-X2-/actions/runs/44667095940/artifacts/14597997167)：288137926字节，约275MiB，保留至2026-11-27 11:21:51（北京时间）。附件访问需要相应仓库权限；请另行保存交接，不依赖临时附件永久可用。
+- [离线交付附件](https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration/actions/runs/44667095940/artifacts/14597997167)：288137926字节，约275MiB，保留至2026-11-27 11:21:51（北京时间）。附件访问需要相应仓库权限；请另行保存交接，不依赖临时附件永久可用。
 
 ## 交付内容
 

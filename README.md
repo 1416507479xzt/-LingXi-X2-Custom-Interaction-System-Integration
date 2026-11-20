@@ -1,4 +1,6 @@
-# 灵犀 X2 自研交互 Agent
+# LingXi X2 Custom Interaction System Integration
+
+灵犀 X2 自研交互系统接入。
 
 将仿真中的长者陪护交互迁移到灵犀 X2 真机：AimDK 接入麦克风、扬声器、屏幕表情和预设动作；豆包语音负责 ASR/TTS，`doubao-seed-2-0-mini-260428` 负责回答、上下文及表情/动作选择。食堂意见经用户确认后保存，可在电脑网页查看。
 
@@ -56,8 +58,8 @@ Wi-Fi IP每次从机器人信息页核对，不沿用历史地址。`10.0.1.42`�
 安装Git及Python 3.10或更新版本，在PowerShell执行：
 
 ```powershell
-git clone https://github.com/1416507479xzt/-X2-.git
-Set-Location .\-X2-
+git clone https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration.git
+Set-Location .\-LingXi-X2-Custom-Interaction-System-Integration
 python scripts/build_robot_bundle.py --download-wheels
 python -m zipfile -t .\dist\eldercare_x2_aarch64_py310.zip
 ```

@@ -5,7 +5,7 @@
 ## 结果和版本
 
 - 构建源码：`758b3770be180e9919b2c2aec1bd443d581f5b0f`。
-- [成功运行与检查记录](https://github.com/1416507479xzt/-X2-/actions/runs/44272155330)：GitHub原生ubuntu-24.04-arm节点；镜像linux/arm64、Python 3.10、ROS Humble。
+- [成功运行与检查记录](https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration/actions/runs/44272155330)：GitHub原生ubuntu-24.04-arm节点；镜像linux/arm64、Python 3.10、ROS Humble。
 - 本地镜像标签：`eldercare-x2:candidate`，镜像ID：`sha256:9e9433b9246dabf6cb02b4d2a20192fee2e4948e989781b3890604beb1fa4ca3`。这是构建节点的镜像ID，不是GHCR地址。
 - 已通过：构建、启动help、Python/ROS/应用导入、默认启动缺少SDK时退出22、56项离线回归、Compose配置检查、镜像导出和附件上传。
 - 未验证：目标SDK及共享库挂载、DDS通信、真实麦克风与播音、容器内环节一二四完整业务、机器人部署权限。
@@ -14,7 +14,7 @@
 
 ## 下载与复现
 
-登录GitHub后打开[候选附件](https://github.com/1416507479xzt/-X2-/actions/runs/44272155330/artifacts/14413161487)，或进入成功运行页面底部Artifacts下载。附件约275MiB，名称包含完整源码提交，保留至2026-11-25约17:03（北京时间），请及时保存。
+登录GitHub后打开[候选附件](https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration/actions/runs/44272155330/artifacts/14413161487)，或进入成功运行页面底部Artifacts下载。附件约275MiB，名称包含完整源码提交，保留至2026-11-25约17:03（北京时间），请及时保存。
 
 解压附件可得：`eldercare-x2-arm64.tar.gz`、`SHA256SUMS`、`image-inspect.json`、`source-commit.txt`、`VALIDATION.txt`。附件ZIP摘要为`sha256:678775021c75f7fd79c5890fbc0d308fa6760ecd72cbd9b49141a4fb72c4d185`；ZIP摘要与内部tar.gz摘要是不同的值，内部文件用SHA256SUMS验证。
 

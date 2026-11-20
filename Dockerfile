@@ -33,8 +33,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     HOME=/tmp/eldercare-home ROS_HOME=/tmp/eldercare-home/.ros \
     PYTHONPATH=/opt/eldercare/vendor \
     X2_AIMDK_SETUP=/home/agi/aimdk/install/local_setup.bash
-LABEL org.opencontainers.image.title="Lingxi X2 eldercare voice agent" \
-      org.opencontainers.image.source="https://github.com/1416507479xzt/-X2-" \
+LABEL org.opencontainers.image.title="LingXi X2 Custom Interaction System Integration" \
+      org.opencontainers.image.source="https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
 USER 1000:1000

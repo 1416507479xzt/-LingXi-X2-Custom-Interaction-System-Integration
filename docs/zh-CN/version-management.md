@@ -24,7 +24,7 @@ git diff --stat v0.2.0 v0.3.0
 git diff v0.2.0 v0.3.0 -- x2_agent/aimdk_playback.py
 ```
 
-GitHub页面也可直接对比：[第二版到第三版](https://github.com/1416507479xzt/-X2-/compare/v0.2.0...v0.3.0)。CHANGELOG.md记录功能、已知问题和验证边界，详细测试结果在docs/zh-CN。
+GitHub页面也可直接对比：[第二版到第三版](https://github.com/1416507479xzt/-LingXi-X2-Custom-Interaction-System-Integration/compare/v0.2.0...v0.3.0)。CHANGELOG.md记录功能、已知问题和验证边界，详细测试结果在docs/zh-CN。
 
 ## 独立运行旧版本
 
